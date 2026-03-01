@@ -8,9 +8,25 @@
 
 
     let json_data = $derived(main_media.json_data_list[main_media.media_index]);
-    let is_image_auto = $derived(useState.is_image_auto);
     // 画像srtトラック（常に srt_data の最後に入る）
     let imageTrack = $derived(main_media.media.srt_data.find(t => t.isImageTrack));
+
+    // seekTime の変化を監視して画像を自動切り替え（再生中・手動シーク両方対応）
+    $effect(() => {
+        if (!useState.is_image_auto || !imageTrack) return;
+        const entry = getCurrentText(imageTrack.data, json_data.seekTime);
+        if (!entry.text || entry.text === main_media.media.image_data.currentImagePath) return;
+        // async 画像読み込み
+        (async () => {
+            const imageFile = await getFileFromPath(useState.dirHandle, entry.text.replace(/\\/g, "/"));
+            const imageURL = URL.createObjectURL(imageFile);
+            const oldUrl = main_media.media.image_data.currentImage;
+            if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            main_media.media.image_data.currentImage = imageURL;
+            main_media.media.image_data.currentImagePath = entry.text;
+            main_media.media.image_data.currentId = entry.index;
+        })();
+    });
 
     function scrollEditor() {
         for (const ref of useRefs.editorRefs) {
@@ -38,19 +54,6 @@
                 const { text, index } = getCurrentText(srt.data, json_data.seekTime);
                 srt.currentText = text;
                 srt.currentTextId = index;
-            }
-            if (useState.is_image_auto && imageTrack) {
-                const entry = getCurrentText(imageTrack.data, json_data.seekTime);
-                if (entry.text != main_media.media.image_data.currentImagePath) {
-                    const imageFile = await getFileFromPath(useState.dirHandle, entry.text.replace(/\\/g, "/"));
-                    const imageURL = URL.createObjectURL(imageFile);
-                    // 旧画像 URL を即座に解放
-                    const oldUrl = main_media.media.image_data.currentImage;
-                    if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-                    main_media.media.image_data.currentImage = imageURL;
-                    main_media.media.image_data.currentImagePath = entry.text;
-                    main_media.media.image_data.currentId = entry.index;
-                }
             }
             if (useState.autoScroll) {
                 scrollEditor();
