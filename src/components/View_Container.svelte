@@ -62,7 +62,9 @@
     {#if main_media.media.image_data?.currentImage}
         <img src={main_media.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
         {#each main_media.media.srt_data as srt, index}
-            <SrtOverlay index={index} bind:scale={main_media.imageBaseScale} bind:pos={main_media.imagePos}></SrtOverlay>
+            {#if !srt.isImageTrack}
+                <SrtOverlay index={index} bind:scale={main_media.imageBaseScale} bind:pos={main_media.imagePos}></SrtOverlay>
+            {/if}
         {/each}
     {/if}
     {#if display_position}
