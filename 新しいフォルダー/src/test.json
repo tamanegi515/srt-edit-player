@@ -1,0 +1,10 @@
+{
+  "name": "track1",
+  "data": [
+    {
+      "startTime": 0,
+      "endTime": 10,
+      "text": "Clip 1"
+    }
+  ]
+}

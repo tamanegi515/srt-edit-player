@@ -1,0 +1,103 @@
+@font-face {
+    font-family: '縦書き用りいポップ角';
+    src: local("りいポップ角 R");
+}
+
+@font-face {
+    font-family: '縦書き用りいポップ角';
+    src: local("BIZ UDPゴシック");
+    unicode-range: U+309B;
+}
+
+@font-face {
+    font-family: '縦書き用りいてがきN';
+    src: local("りいてがきN R");
+}
+
+@font-face {
+    font-family: '縦書き用りいてがきN';
+    src: local("UD デジタル 教科書体 NK-R");
+    unicode-range: U+309B;
+}
+
+@font-face {
+    font-family: '縦書き用りいてがき筆';
+    src: local("りいてがき筆");
+}
+
+@font-face {
+    font-family: '縦書き用りいてがき筆';
+    src: local("UD デジタル 教科書体 NK-B");
+    unicode-range: U+309B;
+}
+
+
+@font-face {
+    font-family: '縦書き用あずきフォントP';
+    src: local("あずきフォントP");
+}
+
+@font-face {
+    font-family: '縦書き用あずきフォントP';
+    src: local("UD デジタル 教科書体 NK-R");
+    unicode-range: U+309B;
+}
+
+
+@font-face {
+    font-family: '縦書き用HGP行書体';
+    src: local("HGP行書体");
+}
+
+@font-face {
+    font-family: '縦書き用HGP行書体';
+    src: local("UD デジタル 教科書体 NK-R");
+    unicode-range: U+309B;
+}
+
+@font-face {
+    font-family: '縦書き用HGP教科書体';
+    src: local("HGP教科書体");
+}
+
+@font-face {
+    font-family: '縦書き用HGP教科書体';
+    src: local("UD デジタル 教科書体 NK-R");
+    unicode-range: U+309B;
+}
+
+@font-face {
+    font-family: '縦書き用HGP明朝E';
+    src: local("HGP明朝E");
+}
+
+@font-face {
+    font-family: '縦書き用HGP明朝E';
+    src: local("BIZ UDP明朝 Medium");
+    unicode-range: U+309B;
+}
+
+@font-face {
+    font-family: '縦書き用HGP創英角ﾎﾟｯﾌﾟ体';
+    src: local("HGP創英角ﾎﾟｯﾌﾟ体");
+}
+
+@font-face {
+    font-family: '縦書き用HGP創英角ﾎﾟｯﾌﾟ体';
+    src: local("BIZ UDPゴシック");
+    unicode-range: U+309B;
+}
+
+.custom-font {
+    font-family: 'CustomFont1', 'りいポップ角', sans-serif;
+}
+
+
+/*
+  ﾞ　濁点（半角）
+  ゛ 濁点（全角）
+
+  りいポップ角
+  @UD デジタル 教科書体 NK-B
+  
+  */
