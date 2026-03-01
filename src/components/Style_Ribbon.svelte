@@ -91,12 +91,12 @@
                 <td>
                     <div class="ribbon-area" style="min-width:120px">
                         <div class="area-title">- style -</div>
-                        <select bind:value={currentSrt} onwheel={(e) => handleWheel("srtbox", e)}>
+                        <select bind:value={main_media.currentSrt} onwheel={(e) => handleWheel("srtbox", e)}>
                             {#each srtFiles as srt, index}
                                 <option value={index}>{srt.filePath}</option>
                             {/each}
                         </select>
-                        <select bind:value={currentStyle} onwheel={(e) => handleWheel("style", e)}>
+                        <select bind:value={main_media.currentStyle} onwheel={(e) => handleWheel("style", e)}>
                             {#each style_list as style, index}
                                 <option value={index}>{style.name}</option>
                             {/each}
