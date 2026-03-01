@@ -58,15 +58,16 @@
     }
     async function changeIMG(id) {
         const data = main_media.media.image_data.data;
-        console.log(data);
-        main_media.media.image_data.currentId += id;
-        const imageFile = await getFileFromPath(useState.dirHandle, data[main_media.media.image_data.currentId].text.replace(/\\/g, "/"));
+        const nextId = main_media.media.image_data.currentId + id;
+        if (nextId < 0 || nextId >= data.length) return;
+        main_media.media.image_data.currentId = nextId;
+        const imageFile = await getFileFromPath(useState.dirHandle, data[nextId].text.replace(/\\/g, "/"));
         const imageURL = URL.createObjectURL(imageFile);
         // 旧画像 URL を即座に解放
         const oldUrl = main_media.media.image_data.currentImage;
         if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
         main_media.media.image_data.currentImage = imageURL;
-        main_media.media.image_data.currentImagePath = data[main_media.media.image_data.currentId].text;
+        main_media.media.image_data.currentImagePath = data[nextId].text;
     }
     // タイム表示
     function formatTime(seconds) {
@@ -152,9 +153,13 @@
             </label>
 
             <div style="flex: 0 1 auto;">
-                <button class="nmorph_button" onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
+                <button class="nmorph_button"
+                    disabled={main_media.media.image_data.currentId <= 0}
+                    onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
                 画像
-                <button class="nmorph_button" onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
+                <button class="nmorph_button"
+                    disabled={main_media.media.image_data.currentId >= (main_media.media.image_data.data?.length ?? 1) - 1}
+                    onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
             </div>
         </div>
     </div>
