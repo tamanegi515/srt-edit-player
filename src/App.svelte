@@ -2,8 +2,8 @@
   import StyleRibbon from "./components/Style_Ribbon.svelte";
   import MediaPlayer from "./components/Media_Player.svelte";
   import SrtEditor from "./components/Srt_Editor.svelte";
-  import { onMount } from "svelte";
-  import { devicePixelRatio, innerHeight, innerWidth, online, outerHeight, outerWidth, screenLeft, screenTop, scrollX, scrollY } from "svelte/reactivity/window";
+  import { onMount, untrack } from "svelte";
+  import { innerHeight, innerWidth } from "svelte/reactivity/window";
   import { main_media, useState, useStyleList, useRefs, useAudio } from "./lib/store.svelte";
   import { getDefaultMedia, getJsonDataList, getMedia, saveJsonFile, saveSrtFile } from "./lib/data_process";
   import Track from "./components/Track.svelte";
@@ -27,8 +27,9 @@
 
   // @ts-ignore
   $effect(async () => {
-    const prevVol = main_media.media.volume;
-    const prevRate = main_media.media.playbackRate;
+    // json_data / dirHandle の変化だけを追跡し、media への書き戻しで再実行しないよう untrack で退避
+    const prevVol  = untrack(() => main_media.media.volume);
+    const prevRate = untrack(() => main_media.media.playbackRate);
     const result = await getMedia(json_data, useState.dirHandle);
     useAudio.set(result.audio ?? null);
     const { audio: _ignored, ...rest } = result;

@@ -10,8 +10,7 @@
         return tracks.reduce((sum, track) => sum + track.height, 0);
     });
     let gridRowStyle = $derived.by(() => {
-        const style = tracks.map((track) => `${track.height}px`).join(" ");
-        console.log(style);
+        const style = tracks.map((track) => `${track.height ?? 40}px`).join(" ");
         return style;
     });
     let leftWidth = $state(300);
