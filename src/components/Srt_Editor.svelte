@@ -1,13 +1,11 @@
 <script>
     import { onMount } from "svelte";
-    import { devicePixelRatio, innerHeight, innerWidth, online, outerHeight, outerWidth, screenLeft, screenTop, scrollX, scrollY } from "svelte/reactivity/window";
-    import { main_media, useState, useStyleList, useRefs, useAudio } from "../lib/store.svelte";
+    import { main_media, useState, useRefs, useAudio } from "../lib/store.svelte";
     import CustomTextarea from "./Custom_Textarea.svelte";
     import { getCurrentText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
 
-    // import { btn_param } from '../App.svelte'
-    let { parents_height = $bindable(), is_original_text = $bindable(), ...props } = $props();
+    let { parents_height = $bindable(), ...props } = $props();
     let srt_index = $state(0);
     let srtFiles = $derived(main_media.media.srt_data);
     let srt_data = $derived(main_media.media.srt_data[srt_index].data);
@@ -109,7 +107,7 @@
                 {:else}
                     <small>{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
                 {/if}
-                {#if !is_original_text}
+                {#if !useState.is_original_text}
                     <CustomTextarea bind:srt_id={srt_index} data_id={index} bind:this={textareaRefs[index]}></CustomTextarea>
                 {:else}
                     <textarea

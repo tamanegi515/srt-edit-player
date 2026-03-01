@@ -39,7 +39,7 @@
         window.removeEventListener("mouseup", stopResizing);
     });
     let timeLineRef = $state();
-    let ratioValue = $state(2);
+    // 拡大率は useState.timeLineRatio で一元管理
     let intervals = $state([
         [100, 500, 1000, 10000],
         [1000, 5000, 10000, 60000],
@@ -47,7 +47,7 @@
         [60000, 300000, 600000, 3600000],
     ]);
     let duration = $state(3600000);
-    let pixel_per_msec = $derived((ratioValue * ratioValue) / 1000);
+    let pixel_per_msec = $derived((useState.timeLineRatio * useState.timeLineRatio) / 1000);
     let offsetX = $state(0);
     let canvas;
     function panelScroll(e) {
@@ -151,7 +151,7 @@
 </script>
 
 <div bind:this = {useRefs.trackRef}>
-    拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={ratioValue} />
+    拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={useState.timeLineRatio} />
     AutoScroll：
     <label class="toggle_switch" style="margin-right: 5px;">
         <input type="checkbox" bind:checked={useState.timeLineAuto} style="visibility: hidden;" />
@@ -182,7 +182,7 @@
                 </div>
                 {#each tracks as track, id}
                     <div class="track" style="grid-row-start:{id + 2};grid-row-end:{id + 3};">
-                        <Track {id} bind:ratioValue></Track>
+                        <Track {id}></Track>
                     </div>
                 {/each}
             </div>

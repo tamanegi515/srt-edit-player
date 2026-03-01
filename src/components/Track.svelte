@@ -1,14 +1,14 @@
 <script>
-    import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
+    import { main_media, useState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
     import { onMount, onDestroy } from "svelte";
 
-    let { id = $bindable(), ratioValue = $bindable() } = $props();
+    let { id = $bindable() } = $props();
     //   data = [{startSec:s,endSec:n,text:str}]
     const duration = $derived(main_media.media.duration);
     const data = $derived(main_media.media.srt_data[id].data);
 
-    let zoomRatio = $derived(ratioValue * ratioValue);
+    let zoomRatio = $derived(useState.timeLineRatio * useState.timeLineRatio);
     let isDragging = $state(false);
     let didDrag = $state(false);
     let dragStartX = $state(0);

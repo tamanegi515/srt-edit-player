@@ -39,7 +39,7 @@
             }
             if (is_image_auto) {
                 const imagePath = getCurrentText(main_media.media.image_data.data, json_data.seekTime);
-                if (imagePath != main_media.media.image_data.currentImagePath) {
+                if (imagePath.text != main_media.media.image_data.currentImagePath) {
                     const imageFile = await getFileFromPath(useState.dirHandle, imagePath.text.replace(/\\/g, "/"));
                     const imageURL = URL.createObjectURL(imageFile);
                     // 旧画像 URL を即座に解放

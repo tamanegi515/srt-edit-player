@@ -7,12 +7,11 @@ export const useState = $state({
     view_srt_frame: false,
     json_save_status: 0,
     srt_save_status: 0,
-    hasUnloadHandler: false,
     autoScroll: false,
-    blobUrls: [],
     viewRibbon: true,
     viewTrack: true,
-    timeLineAuto: true
+    timeLineAuto: true,
+    timeLineRatio: 2,   // タイムラインの拡大率
 });
 
 
@@ -31,7 +30,6 @@ export const main_media = $state({
     media_index: 0,
     currentStyle: 0,
     currentSrt: 0,
-    activeSrt: 0,
     imageScale: { w: 1, h: 1 },
     imageBaseScale: { w: 1, h: 1 },
     imagePos: { x: 0, y: 0 }
@@ -107,36 +105,5 @@ export const useAudio = {
     }
 };
 
-// export const style_list = $derived.by(() => {
-//     const data = main_media.json_data_list[main_media.media_index];
-//     if (!data || !data.styles || Object.keys(data.styles).length === 0) {
-//         return [{ name: "dummy", color: "#000000" }];
-//     }
-//     return Object.keys(data.styles).map((name, i) => ({
-//         name,
-//         color: colorPalette[i % colorPalette.length],
-//     }));
-// });
 
-//   let tableRef = $state();
-//   let editorRefs = $state([]);
-// フラグ・UI操作まわり
-// export const is_original_text = $state(false);
-// export const view_srt_frame = $state(false);
-// export const json_save_status = $state(0);
-// export const hasUnloadHandler = false;
-// export const dirHandle = $state();
-
-// // メモリ管理用
-// export const blobUrls = $state([]);
-
-// // メインモデルに関わる変数
-// export const selected_Folder = $state("フォルダを選択してください。");
-// export const currentStyle = $state(0);
-// export const currentSrt = $state(0);
-// export const media_index = $state(0);
-
-// // メインモデル
-// export const json_data_list = $state([getDefaultJsonData()]);
-// export const media = $state(getDefaultMedia());
 

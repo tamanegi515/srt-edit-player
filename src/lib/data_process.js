@@ -13,7 +13,6 @@ export function getDefaultMedia(){
         isAudio: true,
         isPlaying: false,
         duration: 0,
-        currentTime: 0,
         playbackRate: 1,
         volume: 0.5,
       }
@@ -68,9 +67,8 @@ export async function getMedia(data,dirHandle) {
       isAudio: true,
       isPlaying: false,
       duration: audio.duration,
-      currentTime: audio.currentTime,
-      playbackRate: 1,
-      volume: 0.5,
+      playbackRate: 1,   // 呼び出し元で現在値に上書きされる
+      volume: 0.5,       // 同上
     };
   }
 

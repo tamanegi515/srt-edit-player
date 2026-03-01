@@ -27,10 +27,15 @@
 
   // @ts-ignore
   $effect(async () => {
+    const prevVol = main_media.media.volume;
+    const prevRate = main_media.media.playbackRate;
     const result = await getMedia(json_data, useState.dirHandle);
     useAudio.set(result.audio ?? null);
     const { audio: _ignored, ...rest } = result;
     main_media.media = rest;
+    // メディア切り替え後も音量・倍速を維持
+    useAudio.setVol(prevVol);
+    useAudio.setRate(prevRate);
   });
 
   // UI部品まわりの変数
@@ -94,6 +99,7 @@
     main_media.selected_Folder = useState.dirHandle.name;
     try {
       const result = await getJsonDataList(useState.dirHandle);
+      main_media.media_index = 0;  // インデックスを必ずリセットしてからリストを反映
       main_media.json_data_list = result;
       console.log("フォルダ読み込み完了：", result);
     } catch (err) {
@@ -198,15 +204,9 @@
   };
 
   onMount(() => {
-    if (!useState.hasUnloadHandler) {
-      window.addEventListener("beforeunload", () => {
-        for (const url of useState.blobUrls) {
-          URL.revokeObjectURL(url);
-        }
-        useState.blobUrls.length = 0;
-      });
-      useState.hasUnloadHandler = true;
-    }
+    window.addEventListener("beforeunload", () => {
+      useAudio.stop();
+    });
   });
 </script>
 
@@ -319,7 +319,7 @@
                       <input class="dark" type="checkbox" bind:checked={useState.is_original_text} style="transform: scale(1.3); margin-right: 5px;" />
                       raw
                     </label>
-                    <button class="nmorph_button" onclick={scrollEditor} title="再生位置にスクロール"> Scroll </button>
+                        <button class="nmorph_button" onclick={scrollEditor} title="再生位置にスクロール"> Scroll </button>
                     <button class="nmorph_button" onclick={save_SRT_Files} title="字幕を保存">
                       {#if useState.srt_save_status == 0}
                         <span class="material-symbols-outlined"> save_as </span>
@@ -339,7 +339,7 @@
                       <div style="display: flex; height: 100%;">
                         <div class="resize-bar" role="button" tabindex="-1" onmousedown={(event) => startDrag(event, index)}></div>
                         <div style="flex-grow: 1; height: 100%;">
-                          <SrtEditor bind:this={useRefs.editorRefs[index]} parents_height={tableHeight} bind:is_original_text={useState.is_original_text} style="height: 100%;" />
+                          <SrtEditor bind:this={useRefs.editorRefs[index]} parents_height={tableHeight} style="height: 100%;" />
                         </div>
                       </div>
                     </td>
