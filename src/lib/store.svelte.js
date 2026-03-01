@@ -70,27 +70,40 @@ export const useRefs = $state({
 let json_data = $derived(main_media.json_data_list[main_media.media_index]);
 
 
+// Audio (HTMLMediaElement) は Proxy 化すべき Web API オブジェクトのため $state の外で管理
+let _audio = /** @type {HTMLAudioElement|null} */ (null);
+
 export const useAudio = {
+    /** @returns {HTMLAudioElement|null} */
+    get audio() { return _audio; },
+    /** @param {HTMLAudioElement|null} a */
+    set(a) { _audio = a; },
+    stop() {
+        if (_audio) {
+            _audio.pause();
+            _audio.src = '';
+        }
+        main_media.media.isPlaying = false;
+    },
     pause() {
-        main_media.media.audio.pause();
+        _audio?.pause();
         main_media.media.isPlaying = false;
     },
     play() {
-        main_media.media.audio.play();
+        _audio?.play();
         main_media.media.isPlaying = true;
     },
     seek(time = json_data.seekTime) {
-
         json_data.seekTime = time;
-        main_media.media.audio.currentTime = time;
+        if (_audio) _audio.currentTime = time;
     },
     setVol(vol = main_media.media.volume) {
         main_media.media.volume = vol;
-        main_media.media.audio.volume = vol;
+        if (_audio) _audio.volume = vol;
     },
     setRate(rate = main_media.media.playbackRate) {
         main_media.media.playbackRate = rate;
-        main_media.media.audio.playbackRate = rate;
+        if (_audio) _audio.playbackRate = rate;
     }
 };
 

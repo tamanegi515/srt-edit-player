@@ -8,7 +8,6 @@ import { saveFile, getFileFromPath, convSecToStr, convStrToSec, COLOR } from "./
 export function getDefaultMedia(){
     return {
         name: "メディアなし",
-        audio: {},
         image_data: {},
         srt_data: [{}],
         isAudio: true,

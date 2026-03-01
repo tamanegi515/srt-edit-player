@@ -4,7 +4,7 @@
   import SrtEditor from "./components/Srt_Editor.svelte";
   import { onMount } from "svelte";
   import { devicePixelRatio, innerHeight, innerWidth, online, outerHeight, outerWidth, screenLeft, screenTop, scrollX, scrollY } from "svelte/reactivity/window";
-  import { main_media, useState, useStyleList, useRefs } from "./lib/store.svelte";
+  import { main_media, useState, useStyleList, useRefs, useAudio } from "./lib/store.svelte";
   import { getDefaultMedia, getJsonDataList, getMedia, saveJsonFile, saveSrtFile } from "./lib/data_process";
   import Track from "./components/Track.svelte";
   import TrackView from "./components/Track_View.svelte";
@@ -27,7 +27,10 @@
 
   // @ts-ignore
   $effect(async () => {
-    main_media.media = await getMedia(json_data, useState.dirHandle);
+    const result = await getMedia(json_data, useState.dirHandle);
+    useAudio.set(result.audio ?? null);
+    const { audio: _ignored, ...rest } = result;
+    main_media.media = rest;
   });
 
   // UI部品まわりの変数
@@ -38,13 +41,25 @@
     return columnWidths.reduce((sum, w) => sum + w, 0);
   });
 
+  // trackRef のサイズ変化を ResizeObserver でリアクティブに追跡
+  let trackHeight = $state(0);
+  $effect(() => {
+    const el = useRefs.trackRef;
+    if (!el) return;
+    const ro = new ResizeObserver(([entry]) => {
+      trackHeight = entry.contentRect.height;
+    });
+    ro.observe(el);
+    trackHeight = el.getBoundingClientRect().height;
+    return () => ro.disconnect();
+  });
+
   const tableHeight = $derived.by(() => {
     if (useRefs.tableRef) {
       const rect = useRefs.tableRef.getBoundingClientRect();
       const bottomSpace = innerHeight.current - rect.top;
-      if (useRefs.trackRef){
-        const trackRect = useRefs.trackRef.getBoundingClientRect();
-        return bottomSpace - (10 + trackRect.height);
+      if (trackHeight > 0) {
+        return bottomSpace - (10 + trackHeight);
       }
       return bottomSpace - 10;
     }
@@ -59,10 +74,7 @@
   // });
 
   function stopAudio() {
-    if (main_media.media.audio instanceof Audio && !main_media.media.audio.paused) {
-      main_media.media.audio.pause();
-      main_media.media.audio.src = ""; // 再利用を防ぐ（GC対象にする）
-    }
+    useAudio.stop();
   }
 
   // フォルダを読み込み、json_dataを作成

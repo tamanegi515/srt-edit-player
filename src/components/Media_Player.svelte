@@ -30,8 +30,8 @@
         }
     }
     async function tick() {
-        if (main_media.media.audio && !main_media.media.audio.paused) {
-            json_data.seekTime = main_media.media.audio.currentTime;
+        if (useAudio.audio && !useAudio.audio.paused) {
+            json_data.seekTime = useAudio.audio.currentTime;
             for (const srt of main_media.media.srt_data) {
                 const { text, index } = getCurrentText(srt.data, json_data.seekTime);
                 srt.currentText = text;
@@ -79,7 +79,7 @@
 
     function formattedTime() {
         const formattedSeek = formatTime(json_data.seekTime);
-        const formattedDuration = formatTime(main_media.media.audio.duration);
+        const formattedDuration = formatTime(main_media.media.duration);
         return `${formattedSeek}/${formattedDuration}`;
     }
     function handleWheel(prop, event) {
@@ -119,14 +119,14 @@
             <input
                 type="range"
                 min="0"
-                max={main_media.media.audio.duration}
+                max={main_media.media.duration}
                 step="0.1"
                 bind:value={json_data.seekTime}
                 oninput={() => useAudio.seek()}
                 onwheel={(e) => handleWheel("seek", e)}
             />
             <p class="setRight">
-                {formatTime(json_data.seekTime)} / {formatTime(main_media.media.audio.duration)}
+                {formatTime(json_data.seekTime)} / {formatTime(main_media.media.duration)}
             </p>
         </div>
 

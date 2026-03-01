@@ -59,7 +59,7 @@
     function setStartTime(id) {
         // console.log(srt_data);
         if (id > 0) {
-            srt_data[id].startTime = main_media.media.audio.currentTime;
+            srt_data[id].startTime = useAudio.audio?.currentTime ?? 0;
             srt_data[id - 1].endTime = srt_data[id].startTime;
             srt_data[id].startTimeStr = convSecToStr(srt_data[id].startTime);
             srt_data[id - 1].endTimeStr = convSecToStr(srt_data[id - 1].endTime);
@@ -68,7 +68,7 @@
     function setEndTime(id) {
         // console.log("aaa");
         if (id < srt_data.length - 1) {
-            srt_data[id].endTime = main_media.media.audio.currentTime;
+            srt_data[id].endTime = useAudio.audio?.currentTime ?? 0;
             srt_data[id + 1].startTime = srt_data[id].endTime;
             srt_data[id].endTimeStr = convSecToStr(srt_data[id].endTime);
             srt_data[id + 1].startTimeStr = convSecToStr(srt_data[id + 1].startTime);
