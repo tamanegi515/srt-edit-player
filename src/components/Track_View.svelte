@@ -176,7 +176,16 @@
                     panelScroll(e);
                 }}
             >
-                <div class="track" style="grid-row-start:1;grid-row-end:2;">
+                <div class="track" style="grid-row-start:1;grid-row-end:2;"
+                    onclick={(e) => {
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left + offsetX;
+                        const time = clickX / pixel_per_msec / 1000;
+                        const duration = main_media.media.duration;
+                        useAudio.seek(Math.max(0, Math.min(time, duration)));
+                    }}
+                    style:cursor="pointer"
+                >
                     <canvas class="tickmark" bind:this={canvas} style="left:0px;"></canvas>
                 </div>
                 {#each tracks as track, id}
