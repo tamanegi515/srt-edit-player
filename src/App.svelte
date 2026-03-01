@@ -193,8 +193,10 @@
   <button
     class="nmorph_button"
     onclick={() => {
-      main_media.media_index -= 1;
-      stopAudio();
+      if (main_media.media_index > 0) {
+        main_media.media_index -= 1;
+        stopAudio();
+      }
     }}
   >
     ◀
@@ -216,13 +218,12 @@
       <span class="material-symbols-outlined"> error </span>
     {/if}
   </button>
-  <button
-    class="nmorph_button"
-    onclick={() => {
+  <button class="nmorph_button" onclick={() => {
+    if (main_media.media_index < main_media.json_data_list.length - 1) {
       main_media.media_index += 1;
       stopAudio();
-    }}
-  >
+    }
+  }}>
     ▶
   </button>
   <span class="head-text">View Frame：</span>

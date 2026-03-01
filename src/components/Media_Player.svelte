@@ -42,9 +42,11 @@
                 if (imagePath != main_media.media.image_data.currentImagePath) {
                     const imageFile = await getFileFromPath(useState.dirHandle, imagePath.text.replace(/\\/g, "/"));
                     const imageURL = URL.createObjectURL(imageFile);
-                    useState.blobUrls.push(imageURL);
+                    // 旧画像 URL を即座に解放
+                    const oldUrl = main_media.media.image_data.currentImage;
+                    if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
                     main_media.media.image_data.currentImage = imageURL;
-                    main_media.media.image_data.currentImagePath = imageFile.text;
+                    main_media.media.image_data.currentImagePath = imagePath.text;
                     main_media.media.image_data.currentId = imagePath.index;
                 }
             }
@@ -60,9 +62,11 @@
         main_media.media.image_data.currentId += id;
         const imageFile = await getFileFromPath(useState.dirHandle, data[main_media.media.image_data.currentId].text.replace(/\\/g, "/"));
         const imageURL = URL.createObjectURL(imageFile);
-        useState.blobUrls.push(imageURL);
+        // 旧画像 URL を即座に解放
+        const oldUrl = main_media.media.image_data.currentImage;
+        if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
         main_media.media.image_data.currentImage = imageURL;
-        main_media.media.image_data.currentImagePath = imageFile.text;
+        main_media.media.image_data.currentImagePath = data[main_media.media.image_data.currentId].text;
     }
     const timeupdate_SRT = (point) => {
         // switch (point) {

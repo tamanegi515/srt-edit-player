@@ -1,6 +1,7 @@
 <script>
     import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
+    import { onMount, onDestroy } from "svelte";
 
     let { id = $bindable(), ratioValue = $bindable() } = $props();
     //   data = [{startSec:s,endSec:n,text:str}]
@@ -46,8 +47,14 @@
         document.body.style.cursor = "default";
     }
 
-    window.addEventListener("mousemove", onDrag);
-    window.addEventListener("mouseup", stopDrag);
+    onMount(() => {
+        window.addEventListener("mousemove", onDrag);
+        window.addEventListener("mouseup", stopDrag);
+    });
+    onDestroy(() => {
+        window.removeEventListener("mousemove", onDrag);
+        window.removeEventListener("mouseup", stopDrag);
+    });
 </script>
 
 <div class="timeline" style="width: {duration * zoomRatio}px;">

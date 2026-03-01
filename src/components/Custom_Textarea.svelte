@@ -34,7 +34,8 @@
             e.preventDefault();
             if (undoStack.length > 0) {
                 const current = editorRef.innerHTML;
-                const prev = undoStack.pop();
+                const prev = undoStack[undoStack.length - 1];
+                undoStack = undoStack.slice(0, -1);
                 redoStack = [...redoStack, current];
                 editorRef.innerHTML = prev;
                 updateTextFromHTML();
@@ -45,7 +46,8 @@
             e.preventDefault();
             if (redoStack.length > 0) {
                 const current = editorRef.innerHTML;
-                const next = redoStack.pop();
+                const next = redoStack[redoStack.length - 1];
+                redoStack = redoStack.slice(0, -1);
                 undoStack = [...undoStack, current];
                 editorRef.innerHTML = next;
                 updateTextFromHTML();

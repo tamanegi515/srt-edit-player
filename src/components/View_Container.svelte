@@ -7,17 +7,13 @@
     let mousePercent = $state({ x: "0", y: "0" });
     let display_position = $state(false);
 
-    let imageScale = $derived(main_media.imageScale);
-    let imageBaseScale = $derived(main_media.imageBaseScale);
-    let imagePos = $derived(main_media.imagePos);
-
     function updateImageRect() {
         if (useRefs.imageRef && useRefs.imageRef.offsetParent) {
-            imageScale = {
+            main_media.imageScale = {
                 w: useRefs.imageRef.clientWidth / useRefs.imageRef.naturalWidth,
                 h: useRefs.imageRef.clientHeight / useRefs.imageRef.naturalHeight,
             };
-            imageBaseScale = {
+            main_media.imageBaseScale = {
                 h: useRefs.imageRef.clientHeight / 1080,
                 w: useRefs.imageRef.clientHeight / 1080,
             };
@@ -25,7 +21,7 @@
             const parentRect = useRefs.imageRef.offsetParent.getBoundingClientRect();
 
             // 親との相対位置
-            imagePos = {
+            main_media.imagePos = {
                 x: imageRect.left - parentRect.left,
                 y: imageRect.top - parentRect.top,
             };
@@ -66,12 +62,12 @@
     {#if main_media.media.image_data?.currentImage}
         <img src={main_media.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
         {#each main_media.media.srt_data as srt, index}
-            <SrtOverlay index={index} bind:scale={imageBaseScale} bind:pos={imagePos}></SrtOverlay>
+            <SrtOverlay index={index} bind:scale={main_media.imageBaseScale} bind:pos={main_media.imagePos}></SrtOverlay>
         {/each}
     {/if}
     {#if display_position}
         <div class="overlay-text">
-            X: {imageScale.w}% / Y: {imageScale.h}%
+            X: {main_media.imageScale.w}% / Y: {main_media.imageScale.h}%
         </div>
     {/if}
 </div>

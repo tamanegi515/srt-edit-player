@@ -329,7 +329,7 @@
 
 <div class="srt_box {useState.view_srt_frame ? 'box_visible' : ''}" tabindex="0" bind:this={outboxRef} style={setPosition()} onmousedown={(e) => moveDragStart(e, "out")}>
     <div class="srt_inbox" bind:this={inboxRef} style={setAlign()} onmousedown={(e) => moveDragStart(e, "in")}>
-        <div bind:this={inboxRef}>
+        <div>
             {#each spans as part}
                 <span class="srt_text" style={setParam(part.tag)} data-tag={part.tag} data-text={part.text} onmousedown={(e) => handleTextClick(part.tag)}>
                     {part.text}<br />

@@ -200,11 +200,7 @@ export function getVoiceJsonData(filename, text) {
         };
         
         const outline1Fixed = fixColorObject(outline1);
-        const outline2Fixed = fixColorObject({
-            ...outline2,
-            offsetX: 0,
-            offsetY: 0
-        });
+        const outline2Fixed = fixColorObject({ ...outline2 });
         const shadowFixed = fixColorObject({
             ...shadow,
             steps: 1,
@@ -364,6 +360,7 @@ export function parseSrt(srt_text) {
     let Pattern = /(\d+)\n([\d:,]+)\s-{2}\>\s([\d:,]+)(?:\n{2}|$|(\n[\s\S]*?)(?=\n{2}|$))/g;
 
     const textList = Parse.match(Pattern);
+    if (!textList) return [];
     const srtList = [];
     for (const text of textList) {
         srtList.push(parseSrtBlock(text))
@@ -401,7 +398,7 @@ export function parseSrtBlock(part) {
 
 
 export async function saveSrtFile(dirHandle, name, data, subdir = null) {
-    
+    if (!dirHandle) return false;
 
     try {
         // 保存先ディレクトリの取得
@@ -439,8 +436,7 @@ export function combineToSRT(data) {
             srtText += '\r\n' + srtPart.text.replace(/\r\n\r\n/g, '\r\n　\r\n').replace(/\n\n/g, '\r\n　\r\n');
             if (srtPart.text !== "\r\n") srtText += '\r\n\r\n';
         } else {
-            srtText += '\r\n　';
-            if (srtPart.text !== "\r\n") srtText += '\r\n\r\n';
+            srtText += '\r\n\u3000\r\n\r\n';
         }
         id++;
     }
