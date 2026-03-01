@@ -8,8 +8,8 @@ import { saveFile, getFileFromPath, convSecToStr, convStrToSec, COLOR } from "./
 export function getDefaultMedia(){
     return {
         name: "メディアなし",
-        image_data: {},
-        srt_data: [{}],
+        image_data: { currentId: 0, currentImage: null, currentImagePath: null, size: { x: 0, y: 0 } },
+        srt_data: [],
         isAudio: true,
         isPlaying: false,
         duration: 0,
@@ -49,7 +49,17 @@ export async function getMedia(data,dirHandle) {
     const imgSrtFile = await getFileFromPath(dirHandle, data.imageSrtPath);
     const imgSrtText = await imgSrtFile.text();
     const imgSrtparts = parseSrt(imgSrtText);
-    console.log(data.imageSrtPath);
+    // 画像track を srt_data の末尾に追加（字幕トラックと同じ構造）
+    srtDatafiles.push({
+        id: srtDatafiles.length,
+        name: imgSrtFile.name,
+        file_path: data.imageSrtPath,
+        height: 40,
+        isImageTrack: true,
+        currentText: imgSrtparts[0]?.text ?? '',
+        currentTextId: 0,
+        data: imgSrtparts,
+    });
     const imageFile = await getFileFromPath(dirHandle, imgSrtparts[0]?.text?.replace(/\\/g, "/"));
     const imageURL = URL.createObjectURL(imageFile);
 
@@ -57,11 +67,10 @@ export async function getMedia(data,dirHandle) {
       name: data.name,
       audio,
       image_data: {
-        currentId:0,
+        currentId: 0,
         currentImage: imageURL,
         currentImagePath: imgSrtparts[0]?.text,
         size: { x: 0, y: 0 },
-        data: imgSrtparts,
       },
       srt_data: srtDatafiles,
       isAudio: true,

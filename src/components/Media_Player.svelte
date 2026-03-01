@@ -8,7 +8,9 @@
 
 
     let json_data = $derived(main_media.json_data_list[main_media.media_index]);
-    let is_image_auto = $state(false);
+    let is_image_auto = $derived(useState.is_image_auto);
+    // 画像srtトラック（常に srt_data の最後に入る）
+    let imageTrack = $derived(main_media.media.srt_data.find(t => t.isImageTrack));
 
     function scrollEditor() {
         for (const ref of useRefs.editorRefs) {
@@ -37,17 +39,17 @@
                 srt.currentText = text;
                 srt.currentTextId = index;
             }
-            if (is_image_auto) {
-                const imagePath = getCurrentText(main_media.media.image_data.data, json_data.seekTime);
-                if (imagePath.text != main_media.media.image_data.currentImagePath) {
-                    const imageFile = await getFileFromPath(useState.dirHandle, imagePath.text.replace(/\\/g, "/"));
+            if (useState.is_image_auto && imageTrack) {
+                const entry = getCurrentText(imageTrack.data, json_data.seekTime);
+                if (entry.text != main_media.media.image_data.currentImagePath) {
+                    const imageFile = await getFileFromPath(useState.dirHandle, entry.text.replace(/\\/g, "/"));
                     const imageURL = URL.createObjectURL(imageFile);
                     // 旧画像 URL を即座に解放
                     const oldUrl = main_media.media.image_data.currentImage;
                     if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
                     main_media.media.image_data.currentImage = imageURL;
-                    main_media.media.image_data.currentImagePath = imagePath.text;
-                    main_media.media.image_data.currentId = imagePath.index;
+                    main_media.media.image_data.currentImagePath = entry.text;
+                    main_media.media.image_data.currentId = entry.index;
                 }
             }
             if (useState.autoScroll) {
@@ -57,7 +59,8 @@
         }
     }
     async function changeIMG(id) {
-        const data = main_media.media.image_data.data;
+        if (!imageTrack) return;
+        const data = imageTrack.data;
         const nextId = main_media.media.image_data.currentId + id;
         if (nextId < 0 || nextId >= data.length) return;
         main_media.media.image_data.currentId = nextId;
@@ -158,8 +161,12 @@
                     onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
                 画像
                 <button class="nmorph_button"
-                    disabled={main_media.media.image_data.currentId >= (main_media.media.image_data.data?.length ?? 1) - 1}
+                    disabled={main_media.media.image_data.currentId >= (imageTrack?.data.length ?? 1) - 1}
                     onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
+                <label class="toggle_switch" title="画像自動切り替え" style="margin: 0 5px; vertical-align: middle;">
+                    <input type="checkbox" bind:checked={useState.is_image_auto} style="visibility: hidden;" />
+                    <span class="toggle-slider"></span>
+                </label>
             </div>
         </div>
     </div>

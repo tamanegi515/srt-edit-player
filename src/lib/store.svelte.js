@@ -11,7 +11,8 @@ export const useState = $state({
     viewRibbon: true,
     viewTrack: true,
     timeLineAuto: true,
-    timeLineRatio: 2,   // タイムラインの拡大率
+    timeLineRatio: 2,
+    is_image_auto: false,   // 画像自動切り替え
 });
 
 
