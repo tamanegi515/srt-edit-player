@@ -8,7 +8,11 @@
     let { parents_height = $bindable(), ...props } = $props();
     let srt_index = $state(0);
     let srtFiles = $derived(main_media.media.srt_data);
-    let srt_data = $derived(main_media.media.srt_data[srt_index].data);
+    // srtFiles が変わったとき srt_index が範囲外になるのを防ぐ
+    $effect(() => {
+        if (srt_index >= srtFiles.length) srt_index = 0;
+    });
+    let srt_data = $derived(srtFiles[srt_index]?.data ?? []);
     let textareaHeights = $state([]);
 
     let textareaRefs = $state([]);
@@ -94,7 +98,8 @@
     <div class="box" style="height: {this_height}px;"
         onscroll={() => { if (!isProgrammaticScroll) useState.autoScroll = false; }}
     >
-        {#each srtFiles[srt_index].data as srtdata, index}
+        {#if srtFiles.length > 0}
+        {#each srtFiles[srt_index]?.data ?? [] as srtdata, index}
             <div>
                 <button class="dark nmorph_button" style="height: 24px; margin: 0 10px 6px 7px;" onclick={() => JumpAudio(index)}>
                     <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
@@ -123,6 +128,7 @@
                 {/if}
             </div>
         {/each}
+        {/if}
     </div>
 </div>
 

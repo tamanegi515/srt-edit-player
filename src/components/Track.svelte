@@ -6,7 +6,7 @@
     let { id = $bindable() } = $props();
     //   data = [{startSec:s,endSec:n,text:str}]
     const duration = $derived(main_media.media.duration);
-    const data = $derived(main_media.media.srt_data[id].data);
+    const data = $derived(main_media.media.srt_data[id]?.data ?? []);
 
     let zoomRatio = $derived(useState.timeLineRatio * useState.timeLineRatio);
     let isDragging = $state(false);
