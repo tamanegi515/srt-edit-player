@@ -34,6 +34,7 @@ export async function getMedia(data,dirHandle) {
       const srtfile = await getFileFromPath(dirHandle, srt.filePath);
       const text = await srtfile.text();
       const srt_data = parseSrt(text);
+      extendLastClipToDuration(srt_data, audio.duration);
       srtDatafiles.push({
         id: i,
         name: srtfile.name,
@@ -49,6 +50,7 @@ export async function getMedia(data,dirHandle) {
     const imgSrtFile = await getFileFromPath(dirHandle, data.imageSrtPath);
     const imgSrtText = await imgSrtFile.text();
     const imgSrtparts = parseSrt(imgSrtText);
+    extendLastClipToDuration(imgSrtparts, audio.duration);
     // 画像track を srt_data の末尾に追加（字幕トラックと同じ構造）
     srtDatafiles.push({
         id: srtDatafiles.length,
@@ -373,6 +375,20 @@ export function parseSrt(srt_text) {
     }
     return srtList ? normalizeSrtItems(srtList) : [];
 };
+
+/**
+ * SRT データの最後のクリップの endTime が duration より短い場合に duration まで引き伸ばす
+ * @param {Array} srtData
+ * @param {number} duration 秒
+ */
+export function extendLastClipToDuration(srtData, duration) {
+    if (!srtData || srtData.length === 0 || !duration) return;
+    const last = srtData[srtData.length - 1];
+    if (last.endTime < duration) {
+        last.endTime = duration;
+        last.endTimeStr = convSecToStr(duration);
+    }
+}
 
 
 // SRTファイルのブロックをデータに変換する関数
