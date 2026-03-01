@@ -1,6 +1,4 @@
 <script>
-    import { SvelteURLSearchParams } from "svelte/reactivity";
-    import SrtOverlay from "./SRT_Overlay.svelte";
     import { onDestroy, onMount, tick } from "svelte";
     import { main_media, useStyleList, useState } from "../lib/store.svelte";
     import { calculate_shadow, getCurrentText } from "../lib/data_process";

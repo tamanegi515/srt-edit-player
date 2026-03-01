@@ -25,10 +25,13 @@
         }
     }
 
+    let isProgrammaticScroll = false;
     export function scrollToIndex(time) {
         const index = getCurrentText(srtFiles[srt_index].data, time).index;
         // console.log(textareaRefs);
+        isProgrammaticScroll = true;
         textareaRefs[index]?.scrollToIndex();
+        setTimeout(() => { isProgrammaticScroll = false; }, 150);
     }
 
     function JumpAudio(index) {
@@ -90,7 +93,9 @@
             {/each}
         </select>
     </div>
-    <div class="box" style="height: {this_height}px;">
+    <div class="box" style="height: {this_height}px;"
+        onscroll={() => { if (!isProgrammaticScroll) useState.autoScroll = false; }}
+    >
         {#each srtFiles[srt_index].data as srtdata, index}
             <div>
                 <button class="dark nmorph_button" style="height: 24px; margin: 0 10px 6px 7px;" onclick={() => JumpAudio(index)}>

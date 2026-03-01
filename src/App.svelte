@@ -12,6 +12,17 @@
   let dragging = $state(false);
   let startX = $state(0);
   let startWidth = $state();
+
+  // トースト通知
+  let toastMessage = $state('');
+  let toastType = $state('');
+  let toastTimer;
+  function showToast(message, type = 'success') {
+    toastMessage = message;
+    toastType = type;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastMessage = ''; }, 3000);
+  }
   let json_data = $derived(main_media.json_data_list[main_media.media_index]);
 
   // @ts-ignore
@@ -86,6 +97,7 @@
 
       const success = await saveJsonFile(useState.dirHandle, name, json_data);
       useState.json_save_status = success ? 1 : -1;
+      showToast(success ? 'vc_json 保存完了' : 'vc_json 保存失敗', success ? 'success' : 'error');
 
       // 1秒後にアイコンを通常に戻す
       setTimeout(() => {
@@ -104,6 +116,7 @@
         if (!success) break;
       }
       useState.srt_save_status = success ? 1 : -1;
+      showToast(success ? 'SRT 保存完了' : 'SRT 保存失敗', success ? 'success' : 'error');
 
       // 1秒後にアイコンを通常に戻す
       setTimeout(() => {
@@ -192,6 +205,7 @@
   </button>
   <button
     class="nmorph_button"
+    disabled={main_media.media_index <= 0}
     onclick={() => {
       if (main_media.media_index > 0) {
         main_media.media_index -= 1;
@@ -218,12 +232,14 @@
       <span class="material-symbols-outlined"> error </span>
     {/if}
   </button>
-  <button class="nmorph_button" onclick={() => {
-    if (main_media.media_index < main_media.json_data_list.length - 1) {
-      main_media.media_index += 1;
-      stopAudio();
-    }
-  }}>
+  <button class="nmorph_button"
+    disabled={main_media.media_index >= main_media.json_data_list.length - 1}
+    onclick={() => {
+      if (main_media.media_index < main_media.json_data_list.length - 1) {
+        main_media.media_index += 1;
+        stopAudio();
+      }
+    }}>
     ▶
   </button>
   <span class="head-text">View Frame：</span>
@@ -256,6 +272,10 @@
   </label>
   {#if useState.viewRibbon}
     <StyleRibbon></StyleRibbon>
+  {/if}
+
+  {#if toastMessage}
+    <div class="toast toast-{toastType}">{toastMessage}</div>
   {/if}
   {#if main_media.json_data_list.length > main_media.media_index && json_data?.styles}
     <table style="width: 100%; height: {tableHeight}px;" bind:this={useRefs.tableRef} cellspacing="0" cellpadding="0">
@@ -474,5 +494,30 @@
   }
   .CheckButtonArea input[type="checkbox"]:checked + label span:after {
     color: #fff; /* 文字色             */
+  }
+
+  /* トースト通知 */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    z-index: 9999;
+    pointer-events: none;
+    animation: toast-in 0.2s ease;
+  }
+  .toast-success { background: #1a5c3a; color: #b8f5d0; }
+  .toast-error   { background: #6b1a1a; color: #ffd6d6; }
+  @keyframes toast-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* 非活性ボタン */
+  button:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
   }
 </style>

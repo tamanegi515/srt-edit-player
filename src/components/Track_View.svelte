@@ -1,5 +1,5 @@
 <script>
-    import { onMount } from "svelte";
+    import { onMount, onDestroy } from "svelte";
     import Track from "./Track.svelte";
     import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
@@ -30,8 +30,14 @@
             leftWidth = event.clientX;
         }
     }
-    window.addEventListener("mousemove", handleResize);
-    window.addEventListener("mouseup", stopResizing);
+    onMount(() => {
+        window.addEventListener("mousemove", handleResize);
+        window.addEventListener("mouseup", stopResizing);
+    });
+    onDestroy(() => {
+        window.removeEventListener("mousemove", handleResize);
+        window.removeEventListener("mouseup", stopResizing);
+    });
     let timeLineRef = $state();
     let ratioValue = $state(2);
     let intervals = $state([
@@ -151,7 +157,9 @@
         <input type="checkbox" bind:checked={useState.timeLineAuto} style="visibility: hidden;" />
         <span class="toggle-slider"></span>
     </label>
-    Scroll：
+    <button class="nmorph_button" onclick={scrollTimeLine}>
+        <span class="material-symbols-outlined">skip_next</span>
+    </button>
     <div class="track-view" style="grid-template-columns: {leftWidth}px  5px 1fr;grid-template-rows:1fr;">
         <div class="left-panel" style="display: grid;grid-template-columns: 1fr;grid-template-rows:35px {gridRowStyle};">
             <div>tracks</div>

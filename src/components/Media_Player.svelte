@@ -68,51 +68,6 @@
         main_media.media.image_data.currentImage = imageURL;
         main_media.media.image_data.currentImagePath = data[main_media.media.image_data.currentId].text;
     }
-    const timeupdate_SRT = (point) => {
-        // switch (point) {
-        //     case "prev":
-        //         contents_Store.prevImage();
-        //         break;
-        //     case "next":
-        //         contents_Store.nextImage();
-        //         break;
-        //     case "near":
-        //         const id = currentFormat.srtFile.currentTextId;
-        //         const start = currentFormat.srtFile.data[id].startTime;
-        //         const end = currentFormat.srtFile.data[id].endTime;
-        //         const current =
-        //             contents_Store.contents.audioFile.getCurrentTime();
-        //         if (current - start < end - current) {
-        //             console.log("st");
-        //             timeupdate_SRT_start(
-        //                 contents_Store.contents.audioFile.getCurrentTime(),
-        //                 id,
-        //             );
-        //         } else {
-        //             console.log("en");
-        //             timeupdate_SRT_end(
-        //                 contents_Store.contents.audioFile.getCurrentTime(),
-        //                 id,
-        //             );
-        //         }
-        //         break;
-        //     case "start":
-        //         timeupdate_SRT_start(
-        //             contents_Store.contents.audioFile.getCurrentTime(),
-        //             currentFormat.srtFile.currentTextId,
-        //         );
-        //         break;
-        //     case "end":
-        //         timeupdate_SRT_end(
-        //             contents_Store.contents.audioFile.getCurrentTime(),
-        //             currentFormat.srtFile.currentTextId,
-        //         );
-        //         break;
-        //     default:
-        //         break;
-        // }
-    };
-
     // タイム表示
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
@@ -187,24 +142,19 @@
             <label>
                 音量：
                 <CustomSlider min="0" max="1" step="0.01" bind:value={main_media.media.volume} oninput={() => useAudio.setVol()}></CustomSlider>
-                <span style="display: inline-block;width: 40px;">{main_media.media.volume}</span>
+                <span style="display: inline-block;width: 40px;">{main_media.media.volume.toFixed(2)}</span>
             </label>
 
             <label>
                 倍速：
                 <CustomSlider min="0.5" max="3.0" step="0.05" bind:value={main_media.media.playbackRate} oninput={() => useAudio.setRate()}></CustomSlider>
-                <span style="display: inline-block;width: 40px;">{main_media.media.playbackRate}</span>
+                <span style="display: inline-block;width: 40px;">{main_media.media.playbackRate.toFixed(2)}</span>
             </label>
 
             <div style="flex: 0 1 auto;">
                 <button class="nmorph_button" onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
                 画像
                 <button class="nmorph_button" onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
-
-                字幕タイミング：
-                <button class="nmorph_button" onclick={() => timeupdate_SRT("start")}>|◀</button>
-                <button class="nmorph_button" onclick={() => timeupdate_SRT("near")}>Tap</button>
-                <button class="nmorph_button" onclick={() => timeupdate_SRT("end")}>▶|</button>
             </div>
         </div>
     </div>

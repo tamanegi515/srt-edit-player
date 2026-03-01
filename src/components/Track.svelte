@@ -10,6 +10,7 @@
 
     let zoomRatio = $derived(ratioValue * ratioValue);
     let isDragging = $state(false);
+    let didDrag = $state(false);
     let dragStartX = $state(0);
     let draggedClipIndex = $state(-1);
     let draggingEdge = $state(null);
@@ -17,6 +18,7 @@
     // ドラッグ開始
     function startEdgeDrag(event, index, edge) {
         isDragging = true;
+        didDrag = false;
         dragStartX = event.clientX;
         draggedClipIndex = index;
         draggingEdge = edge;
@@ -26,6 +28,7 @@
     // ドラッグ中
     function onDrag(event) {
         if (isDragging) {
+            didDrag = true;
             const deltaX = (event.clientX - dragStartX) / zoomRatio;
             const currentClip = data[draggedClipIndex];
             const nextClip = data[draggedClipIndex + 1];
@@ -57,9 +60,18 @@
     });
 </script>
 
-<div class="timeline" style="width: {duration * zoomRatio}px;">
+<div class="timeline" style="width: {duration * zoomRatio}px;"
+    onclick={(e) => {
+        if (didDrag) { didDrag = false; return; }
+        const rect = e.currentTarget.getBoundingClientRect();
+        const time = (e.clientX - rect.left) / zoomRatio;
+        useAudio.seek(Math.max(0, Math.min(time, duration)));
+    }}
+>
     {#each data as clip, id}
-        <div class="clip" style="left: {clip.startTime * zoomRatio}px; width: {(clip.endTime - clip.startTime) * zoomRatio}px;">
+        <div class="clip" style="left: {clip.startTime * zoomRatio}px; width: {(clip.endTime - clip.startTime) * zoomRatio}px;"
+            ondblclick={(e) => { e.stopPropagation(); useAudio.seek(clip.startTime); }}
+        >
             {clip.text}
         </div>
         <div class="edge" style="left: {clip.endTime * zoomRatio}px;" onmousedown={(event) => startEdgeDrag(event, id, "end")}></div>
