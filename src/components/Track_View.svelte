@@ -178,8 +178,9 @@
             >
                 <div class="track" style="grid-row-start:1;grid-row-end:2;"
                     onclick={(e) => {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        const clickX = e.clientX - rect.left + offsetX;
+                        // timeLineRef の左端（ビューポート固定）と scrollLeft を使うことで二重加算を防ぐ
+                        const rect = timeLineRef.getBoundingClientRect();
+                        const clickX = e.clientX - rect.left + timeLineRef.scrollLeft;
                         const time = clickX / pixel_per_msec / 1000;
                         const duration = main_media.media.duration;
                         useAudio.seek(Math.max(0, Math.min(time, duration)));
