@@ -71,6 +71,7 @@
         }
     }
 
+    let this_height = $derived.by(() => Math.max(120, parents_height - 130));
 </script>
 
 <div class="srt-editor">
@@ -83,6 +84,7 @@
     </div>
     <div
         class="box"
+        style="height: {this_height}px;"
         data-testid="editor-scroll"
         onscroll={() => {
             if (!isProgrammaticScroll) uiState.autoScroll = false;
@@ -124,7 +126,7 @@
         margin-top: 3px;
     }
     .box {
-        flex: 1 1 auto;
+        flex: 0 0 auto;
         min-height: 0;
         box-sizing: border-box;
         border: 1px solid #363636;

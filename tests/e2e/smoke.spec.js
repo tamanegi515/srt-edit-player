@@ -248,6 +248,79 @@ test("does not create page-level vertical scrolling in the empty project view", 
   });
 });
 
+test("keeps loaded editor content inside the viewport above the timeline", async ({ page }) => {
+  const manyClips = JSON.stringify(Array.from({ length: 40 }, (_, index) => ({
+    speaker: "",
+    start: `00:00:${String(index).padStart(2, "0")},000`,
+    end: `00:00:${String(index + 1).padStart(2, "0")},000`,
+    sentences: [
+      `${index} あの、ここで話したこと、本当に絶対誰にもバレないんですよね。`,
+      "やっぱりその、まだちょっと信じられなくて。",
+    ],
+  })));
+
+  await page.setViewportSize({ width: 1663, height: 923 });
+  await page.addInitScript((jsonText) => {
+    const jsonEntry = {
+      kind: "file",
+      name: "清純派アイドル.json",
+      async getFile() {
+        return new File([jsonText], "清純派アイドル.json", { type: "application/json" });
+      },
+    };
+
+    window.showDirectoryPicker = async () => ({
+      name: "清純派アイドル～涙の卒業ライブ～",
+      async requestPermission() {
+        return "granted";
+      },
+      async *values() {
+        yield jsonEntry;
+      },
+      async getFileHandle(name, options = {}) {
+        if (options.create) {
+          return {
+            async createWritable() {
+              return { async write() {}, async close() {} };
+            },
+          };
+        }
+        if (name === "清純派アイドル.json") return jsonEntry;
+        throw new DOMException(`Missing file: ${name}`, "NotFoundError");
+      },
+    });
+  }, manyClips);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".editor")).toHaveCount(40);
+
+  await expect.poll(() => page.evaluate(() => {
+    const root = document.scrollingElement || document.documentElement;
+    const table = document.querySelector(".workspace-table");
+    const track = document.querySelector(".track-shell");
+    const editorBox = document.querySelector("[data-testid='editor-scroll']");
+    const tableRect = table.getBoundingClientRect();
+    const trackRect = track.getBoundingClientRect();
+    const editorRect = editorBox.getBoundingClientRect();
+    return {
+      rootOverflow: root.scrollHeight - root.clientHeight,
+      bodyOverflow: document.body.scrollHeight - document.body.clientHeight,
+      editorBeforeTimeline: editorRect.bottom <= trackRect.top,
+      workspaceBeforeTimeline: tableRect.bottom <= trackRect.top,
+      trackFitsViewport: trackRect.bottom <= window.innerHeight,
+      editorScrollsInternally: editorBox.scrollHeight > editorBox.clientHeight,
+    };
+  })).toEqual({
+    rootOverflow: 0,
+    bodyOverflow: 0,
+    editorBeforeTimeline: true,
+    workspaceBeforeTimeline: true,
+    trackFitsViewport: true,
+    editorScrollsInternally: true,
+  });
+});
+
 test("loads a sentences json folder with the rich editor state intact", async ({ page }) => {
   const consoleErrors = [];
   page.on("console", (message) => {
