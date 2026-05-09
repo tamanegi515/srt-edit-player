@@ -149,16 +149,18 @@
     });
 </script>
 
-<div bind:this = {useRefs.trackRef}>
-    拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
-    AutoScroll：
-    <label class="toggle_switch" style="margin-right: 5px;">
-        <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
-        <span class="toggle-slider"></span>
-    </label>
-    <button class="nmorph_button" onclick={scrollTimeLine}>
-        <span class="material-symbols-outlined">skip_next</span>
-    </button>
+<div class="track-shell" bind:this = {useRefs.trackRef}>
+    <div class="track-controls">
+        拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
+        AutoScroll：
+        <label class="toggle_switch" style="margin-right: 5px;">
+            <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
+            <span class="toggle-slider"></span>
+        </label>
+        <button class="nmorph_button" onclick={scrollTimeLine}>
+            <span class="material-symbols-outlined">skip_next</span>
+        </button>
+    </div>
     <div class="track-view" style="grid-template-columns: {leftWidth}px  5px 1fr;grid-template-rows:1fr;">
         <div class="left-panel" style="display: grid;grid-template-columns: 1fr;grid-template-rows:35px {gridRowStyle};">
             <div>tracks</div>
@@ -208,6 +210,30 @@
     --shadow-dark: rgb(0, 0, 0);
     --accent: #5e8bff;
     --text-color: #ddd;
+}
+
+.track-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.track-controls {
+    display: flex;
+    align-items: center;
+    height: 28px;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.track-controls .nmorph_button {
+    height: 24px;
+    margin: 0 6px;
+    padding: 0 8px;
+}
+
+.track-controls input[type="range"] {
+    width: 130px;
 }
 
 /* トラックビュー全体 */

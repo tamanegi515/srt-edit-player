@@ -71,10 +71,9 @@
         }
     }
 
-    let this_height = $derived.by(() => parents_height - 110);
 </script>
 
-<div style="margin-top:3px;">
+<div class="srt-editor">
     <div>
         <select class="srt_select" value={column.trackId} onchange={(e) => setEditorColumnTrack(column.id, Number(e.currentTarget.value))}>
             {#each editableSrtFiles as srt}
@@ -84,7 +83,6 @@
     </div>
     <div
         class="box"
-        style="height: {this_height}px;"
         data-testid="editor-scroll"
         onscroll={() => {
             if (!isProgrammaticScroll) uiState.autoScroll = false;
@@ -118,7 +116,16 @@
 </div>
 
 <style>
+    .srt-editor {
+        height: 100%;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        margin-top: 3px;
+    }
     .box {
+        flex: 1 1 auto;
+        min-height: 0;
         box-sizing: border-box;
         border: 1px solid #363636;
         background-color: #3a3a3a3a;

@@ -346,7 +346,7 @@
     .ribbon-area {
         padding: 1px 5px 5px 15px;
         margin: 5px;
-        height: 120px;
+        height: 112px;
         box-sizing: border-box;
         overflow: hidden;
         border-radius: 10px;
@@ -365,6 +365,8 @@
         height: 130px;
         max-height: 130px;
         margin-bottom: 5px;
+        padding-bottom: 12px;
+        box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
         white-space: nowrap;

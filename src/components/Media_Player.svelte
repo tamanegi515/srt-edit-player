@@ -111,16 +111,13 @@
     }
 </script>
 
-<!-- App全体をflex columnにする -->
-<div style="display: flex; flex-direction: column; height: 100%;">
-    <!-- 残りの高さを埋める -->
-    <div style="flex: 1; overflow: hidden;padding: 5px;height: 100%;" onclick={togglePlayback} onwheel={(e) => handleWheel("seek", e)}>
+<div class="media-player">
+    <div class="media-stage" onclick={togglePlayback} onwheel={(e) => handleWheel("seek", e)}>
         <ViewContainer></ViewContainer>
     </div>
 
-    <!-- 下部の音声コントロールUI -->
-    <div style="display: flex; flex-direction: column; gap: 10px; padding: 10px;">
-        <div class="bar-container" style="height: 30px;">
+    <div class="media-controls">
+        <div class="bar-container">
             <input
                 type="range"
                 min="0"
@@ -135,7 +132,7 @@
             </p>
         </div>
 
-        <div style="display: flex; align-items: center; gap: 10px;">
+        <div class="control-row">
             <button class="nmorph_button" onclick={togglePlayback}>
                 {#if mediaState.media.isPlaying}
                     <span class="material-symbols-outlined"> pause </span>
@@ -156,7 +153,7 @@
                 <span style="display: inline-block;width: 40px;">{mediaState.media.playbackRate.toFixed(2)}</span>
             </label>
 
-            <div style="flex: 0 1 auto;">
+            <div class="image-control-group">
                 <button class="nmorph_button"
                     disabled={mediaState.media.image_data.currentId <= 0}
                     onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
@@ -179,8 +176,55 @@
             "FILL" 1,
             "wght" 300,
             "GRAD" 0,
-            "opsz" 24;
+        "opsz" 24;
         /* font-weight:300; */
+    }
+    .media-player {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        gap: 6px;
+    }
+    .media-stage {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        padding: 5px;
+    }
+    .media-controls {
+        flex: 0 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 6px 10px 8px;
+        border-top: 1px solid #383838;
+        background: linear-gradient(180deg, #252527 0%, #202022 100%);
+        box-shadow: inset 0 1px 0 #3b3b3d, 0 -4px 10px #00000030;
+    }
+    .control-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        flex-wrap: wrap;
+    }
+    .control-row label:not(.toggle_switch),
+    .image-control-group {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        min-height: 30px;
+    }
+    .image-control-group {
+        flex: 0 1 auto;
+    }
+    .image-control-group .toggle_switch {
+        flex: 0 0 auto;
+        margin-left: 4px;
+    }
+    .media-controls .nmorph_button {
+        margin: 0 4px;
     }
     .playArea {
         flex: 1;
@@ -204,7 +248,7 @@
         white-space: nowrap;
         width: 90px; /* 固定幅を設定 */
         text-align: right; /* 右揃えに設定 */
-        margin-right: 10px; /* テキストとバーの間隔を設定 */
+        margin: 0 4px 0 6px; /* テキストとバーの間隔を設定 */
     }
 
     input[type="range"] {
@@ -240,6 +284,7 @@
         display: flex;
         align-items: center;
         width: 100%;
+        height: 24px;
     }
 
     .playBtn {

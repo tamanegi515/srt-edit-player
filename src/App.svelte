@@ -108,10 +108,9 @@
     const tableRect = useRefs.tableRef.getBoundingClientRect();
     const mainStyle = getComputedStyle(mainRef);
     const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0;
-    const reservedTrackHeight = uiState.viewTrack
-      ? Math.min(Math.max(trackHeight || 0, 70), 160)
-      : 0;
-    return Math.max(120, Math.floor(mainRect.bottom - tableRect.top - reservedTrackHeight - paddingBottom));
+    const reservedTrackHeight = uiState.viewTrack ? Math.max(trackHeight || 0, 68) : 0;
+    const reservedGap = uiState.viewTrack ? 4 : 0;
+    return Math.max(120, Math.floor(mainRect.bottom - tableRect.top - reservedTrackHeight - reservedGap - paddingBottom));
   });
 
   // メインモデルの監視用
@@ -380,7 +379,7 @@
     <div class="toast toast-{toastType}">{toastMessage}</div>
   {/if}
   {#if projectState.jsonDataList.length > projectState.mediaIndex && json_data?.styles}
-    <table style="width: 100%; height: {tableHeight}px;" bind:this={useRefs.tableRef} cellspacing="0" cellpadding="0">
+    <table class="workspace-table" style="width: 100%; height: {tableHeight}px;" bind:this={useRefs.tableRef} cellspacing="0" cellpadding="0">
       <tbody>
         <tr>
           <!-- 🎬 左側：メディアプレイヤー -->
@@ -454,7 +453,7 @@
 
 <style>
   main {
-    padding: 10px;
+    padding: 8px 10px 4px;
     height: 100dvh;
     box-sizing: border-box;
     overflow: hidden;
@@ -562,7 +561,7 @@
   }
   .srt_area {
     box-sizing: border-box;
-    padding: 10px 15px 0px 3px;
+    padding: 8px 10px 0px 3px;
     background-color: #0e0e0e52;
     /* border: 1px solid #ff0a0a; */
 
@@ -570,6 +569,10 @@
       inset 5px 10px 15px rgba(5, 5, 5, 0.712),
       inset -5px -5px 8px #dbdbdb21;
     border-radius: 8px;
+  }
+  .workspace-table {
+    margin-top: 0;
+    margin-bottom: 4px;
   }
   table {
     overflow: hidden;
