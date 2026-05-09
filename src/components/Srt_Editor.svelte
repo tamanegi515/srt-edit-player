@@ -1,133 +1,118 @@
 <script>
-    import { onMount } from "svelte";
-    import { main_media, useState, useRefs, useAudio } from "../lib/store.svelte";
-    import CustomTextarea from "./Custom_Textarea.svelte";
+    import {
+        mediaState,
+        projectState,
+        selectEditorClip,
+        selectionState,
+        setEditorColumnTrack,
+        uiState,
+        useAudio,
+    } from "../lib/store.svelte";
     import { getCurrentText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
+    import CustomTextarea from "./Custom_Textarea.svelte";
 
-    let { parents_height = $bindable(), ...props } = $props();
-    let srt_index = $state(0);
-    let srtFiles = $derived(main_media.media.srt_data);
-    // srtFiles が変わったとき srt_index が範囲外になるのを防ぐ
+    let { parents_height = $bindable(), column, ...props } = $props();
+
+    let editableSrtFiles = $derived(mediaState.media.srt_data.filter((track) => !track.isImageTrack));
+    let selectedTrack = $derived(editableSrtFiles.find((track) => track.id === column.trackId) ?? editableSrtFiles[0]);
+    let srt_data = $derived(selectedTrack?.data ?? []);
+    let editorRefs = $state([]);
+    let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
+
     $effect(() => {
-        if (srt_index >= srtFiles.length) srt_index = 0;
+        if (!selectedTrack && editableSrtFiles[0]) setEditorColumnTrack(column.id, editableSrtFiles[0].id);
     });
-    let srt_data = $derived(srtFiles[srt_index]?.data ?? []);
-    let textareaHeights = $state([]);
-
-    let textareaRefs = $state([]);
-
-    let json_data = $derived(main_media.json_data_list[main_media.media_index]);
 
     function iscurrent(id) {
-        if (srtFiles[srt_index].data[id].startTime <= json_data.seekTime && json_data.seekTime <= srtFiles[srt_index].data[id].endTime) {
-            return true;
-        } else {
-            return false;
-        }
+        return selectedTrack?.data[id]?.startTime <= json_data.seekTime && json_data.seekTime <= selectedTrack?.data[id]?.endTime;
     }
 
     let isProgrammaticScroll = false;
     export function scrollToIndex(time) {
-        const index = getCurrentText(srtFiles[srt_index].data, time).index;
-        // console.log(textareaRefs);
+        const index = getCurrentText(selectedTrack?.data ?? [], time).index;
         isProgrammaticScroll = true;
-        textareaRefs[index]?.scrollToIndex();
-        setTimeout(() => { isProgrammaticScroll = false; }, 150);
+        editorRefs[index]?.scrollToIndex();
+        setTimeout(() => {
+            isProgrammaticScroll = false;
+        }, 150);
     }
 
     function JumpAudio(index) {
-        // console.log("Jump to", srtFiles[srt_index].data[index].startTime);
-        useAudio.seek(srtFiles[srt_index].data[index].startTime);
-        // 実際の音声ジャンプ処理をここに実装
+        useAudio.seek(selectedTrack.data[index].startTime);
     }
 
     function onTextareaFocus(index) {
-        srtFiles[srt_index].currentTextId = index;
+        if (!selectedTrack) return;
+        selectEditorClip(selectedTrack.id, index);
     }
 
-    function handleContextMenu(event) {
-        event.preventDefault();
-        // 右クリックメニューなど
+    function clampBoundary(time, min, max) {
+        return Math.max(min, Math.min(time, max));
     }
 
-    function adjustTextareaHeight(index) {
-        const textarea = document.getElementById(`textarea-${index}`);
-        if (textarea) {
-            textarea.style.height = "auto";
-            textareaHeights[index] = textarea.scrollHeight;
-        }
-    }
     function setStartTime(id) {
-        // console.log(srt_data);
         if (id > 0) {
-            srt_data[id].startTime = useAudio.audio?.currentTime ?? 0;
+            const time = clampBoundary(useAudio.audio?.currentTime ?? 0, srt_data[id - 1].startTime, srt_data[id].endTime);
+            srt_data[id].startTime = time;
             srt_data[id - 1].endTime = srt_data[id].startTime;
             srt_data[id].startTimeStr = convSecToStr(srt_data[id].startTime);
             srt_data[id - 1].endTimeStr = convSecToStr(srt_data[id - 1].endTime);
         }
     }
+
     function setEndTime(id) {
-        // console.log("aaa");
         if (id < srt_data.length - 1) {
-            srt_data[id].endTime = useAudio.audio?.currentTime ?? 0;
+            const time = clampBoundary(useAudio.audio?.currentTime ?? 0, srt_data[id].startTime, srt_data[id + 1].endTime);
+            srt_data[id].endTime = time;
             srt_data[id + 1].startTime = srt_data[id].endTime;
             srt_data[id].endTimeStr = convSecToStr(srt_data[id].endTime);
             srt_data[id + 1].startTimeStr = convSecToStr(srt_data[id + 1].startTime);
         }
     }
 
-    onMount(() => {
-        // console.log(srtFiles[srt_index]);
-        // console.log(parents_height);
-    });
-
-    let this_height = $derived.by(() => {
-        return parents_height - 110;
-    });
+    let this_height = $derived.by(() => parents_height - 110);
 </script>
 
 <div style="margin-top:3px;">
     <div>
-        <select class="srt_select" bind:value={srt_index}>
-            {#each srtFiles as srt, index}
-                <option value={index}>{srt.name}</option>
+        <select class="srt_select" value={column.trackId} onchange={(e) => setEditorColumnTrack(column.id, Number(e.currentTarget.value))}>
+            {#each editableSrtFiles as srt}
+                <option value={srt.id}>{srt.name}</option>
             {/each}
         </select>
     </div>
-    <div class="box" style="height: {this_height}px;"
-        onscroll={() => { if (!isProgrammaticScroll) useState.autoScroll = false; }}
+    <div
+        class="box"
+        style="height: {this_height}px;"
+        data-testid="editor-scroll"
+        onscroll={() => {
+            if (!isProgrammaticScroll) uiState.autoScroll = false;
+        }}
     >
-        {#if srtFiles.length > 0}
-        {#each srtFiles[srt_index]?.data ?? [] as srtdata, index}
-            <div>
-                <button class="dark nmorph_button" style="height: 24px; margin: 0 10px 6px 7px;" onclick={() => JumpAudio(index)}>
-                    <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
-                </button>
+        {#if selectedTrack}
+            {#each selectedTrack.data ?? [] as srtdata, index}
+                <div>
+                    <button class="dark nmorph_button jump_button" onclick={() => JumpAudio(index)}>
+                        <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
+                    </button>
 
-                {#if iscurrent(index)}
-                    <button onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
-                    <small> - </small>
-                    <button onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
-                {:else}
-                    <small>{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
-                {/if}
-                {#if !useState.is_original_text}
-                    <CustomTextarea bind:srt_id={srt_index} data_id={index} bind:this={textareaRefs[index]}></CustomTextarea>
-                {:else}
-                    <textarea
-                        class="srtTextArea"
-                        id={`textarea-${index}`}
-                        bind:value={srtdata.text}
-                        style="outline: {index === srtFiles[srt_index].currentTextId ? '2px solid #007bff' : '0px'}; 
-                                height: {textareaHeights[index] ?? 40}px;"
+                    {#if iscurrent(index)}
+                        <button onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
+                        <small> - </small>
+                        <button onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
+                    {:else}
+                        <small>{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
+                    {/if}
+                    <CustomTextarea
+                        track_id={selectedTrack.id}
+                        data_id={index}
+                        selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index}
                         onfocus={() => onTextareaFocus(index)}
-                        oncontextmenu={handleContextMenu}
-                        oninput={() => adjustTextareaHeight(index)}
-                    ></textarea>
-                {/if}
-            </div>
-        {/each}
+                        bind:this={editorRefs[index]}
+                    />
+                </div>
+            {/each}
         {/if}
     </div>
 </div>
@@ -142,9 +127,9 @@
         width: 100%;
         scrollbar-gutter: auto;
     }
-    .topbutton {
-        flex: 1;
-        height: 30px;
+    .jump_button {
+        height: 24px;
+        margin: 0 10px 6px 7px;
     }
     .srt_select {
         height: 28px;
@@ -155,16 +140,6 @@
         background-color: #4242424f;
         border: 1px solid #a3a3a328;
         border-radius: 4px;
-    }
-    .srtTextArea {
-        box-sizing: border-box;
-        border-radius: 4px;
-        width: 100%;
-        height: 30px;
-        max-height: 250px;
-        resize: vertical;
-        background: #242424;
-        color: #c2c2c2;
     }
     .dark {
         margin-right: 5px;

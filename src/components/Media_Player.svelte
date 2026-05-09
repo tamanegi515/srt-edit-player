@@ -3,34 +3,34 @@
     import ViewContainer from "./View_Container.svelte";
     import { getFileFromPath, wheelAdjust } from "../lib/util";
     import CustomSlider from "./Custom_Slider.svelte";
-    import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
+    import { mediaState, projectState, uiState, useAudio, useRefs } from "../lib/store.svelte";
     import { getCurrentText } from "../lib/data_process";
 
 
-    let json_data = $derived(main_media.json_data_list[main_media.media_index]);
+    let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
     // 画像srtトラック（常に srt_data の最後に入る）
-    let imageTrack = $derived(main_media.media.srt_data.find(t => t.isImageTrack));
+    let imageTrack = $derived(mediaState.media.srt_data.find(t => t.isImageTrack));
 
     // seekTime の変化を監視して画像を自動切り替え（再生中・手動シーク両方対応）
     $effect(() => {
-        if (!useState.is_image_auto || !imageTrack) return;
+        if (!uiState.imageAuto || !imageTrack) return;
         const entry = getCurrentText(imageTrack.data, json_data.seekTime);
-        if (!entry.text || entry.text === main_media.media.image_data.currentImagePath) return;
+        if (!entry.text || entry.text === mediaState.media.image_data.currentImagePath) return;
         // async 画像読み込み
         (async () => {
-            const imageFile = await getFileFromPath(useState.dirHandle, entry.text.replace(/\\/g, "/"));
+            const imageFile = await getFileFromPath(projectState.dirHandle, entry.text.replace(/\\/g, "/"));
+            if (!imageFile) return;
             const imageURL = URL.createObjectURL(imageFile);
-            const oldUrl = main_media.media.image_data.currentImage;
+            const oldUrl = mediaState.media.image_data.currentImage;
             if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-            main_media.media.image_data.currentImage = imageURL;
-            main_media.media.image_data.currentImagePath = entry.text;
-            main_media.media.image_data.currentId = entry.index;
-        })();
+            mediaState.media.image_data.currentImage = imageURL;
+            mediaState.media.image_data.currentImagePath = entry.text;
+            mediaState.media.image_data.currentId = entry.index;
+        })().catch((err) => console.warn("画像自動切り替えをスキップ:", entry.text, err));
     });
 
     function scrollEditor() {
         for (const ref of useRefs.editorRefs) {
-            console.log(ref);
             if (ref) {
                 ref.scrollToIndex(json_data.seekTime);
             }
@@ -38,11 +38,10 @@
     }
 
     function togglePlayback() {
-        if (main_media.media.isPlaying) {
-            console.log("pause");
+        if (mediaState.media.isPlaying) {
             useAudio.pause();
         } else {
-            console.log("play");
+            if (!useAudio.audio) return;
             useAudio.play();
             requestAnimationFrame(tick);
         }
@@ -50,12 +49,7 @@
     async function tick() {
         if (useAudio.audio && !useAudio.audio.paused) {
             json_data.seekTime = useAudio.audio.currentTime;
-            for (const srt of main_media.media.srt_data) {
-                const { text, index } = getCurrentText(srt.data, json_data.seekTime);
-                srt.currentText = text;
-                srt.currentTextId = index;
-            }
-            if (useState.autoScroll) {
+            if (uiState.autoScroll) {
                 scrollEditor();
             }
             requestAnimationFrame(tick);
@@ -64,16 +58,20 @@
     async function changeIMG(id) {
         if (!imageTrack) return;
         const data = imageTrack.data;
-        const nextId = main_media.media.image_data.currentId + id;
+        const nextId = mediaState.media.image_data.currentId + id;
         if (nextId < 0 || nextId >= data.length) return;
-        main_media.media.image_data.currentId = nextId;
-        const imageFile = await getFileFromPath(useState.dirHandle, data[nextId].text.replace(/\\/g, "/"));
+        mediaState.media.image_data.currentId = nextId;
+        const imageFile = await getFileFromPath(projectState.dirHandle, data[nextId].text.replace(/\\/g, "/")).catch((err) => {
+            console.warn("画像切り替えをスキップ:", data[nextId].text, err);
+            return null;
+        });
+        if (!imageFile) return;
         const imageURL = URL.createObjectURL(imageFile);
         // 旧画像 URL を即座に解放
-        const oldUrl = main_media.media.image_data.currentImage;
+        const oldUrl = mediaState.media.image_data.currentImage;
         if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-        main_media.media.image_data.currentImage = imageURL;
-        main_media.media.image_data.currentImagePath = data[nextId].text;
+        mediaState.media.image_data.currentImage = imageURL;
+        mediaState.media.image_data.currentImagePath = data[nextId].text;
     }
     // タイム表示
     function formatTime(seconds) {
@@ -86,7 +84,7 @@
 
     function formattedTime() {
         const formattedSeek = formatTime(json_data.seekTime);
-        const formattedDuration = formatTime(main_media.media.duration);
+        const formattedDuration = formatTime(mediaState.media.duration);
         return `${formattedSeek}/${formattedDuration}`;
     }
     function handleWheel(prop, event) {
@@ -96,15 +94,15 @@
 
         switch (prop) {
             case "seek":
-                json_data.seekTime += delta;
+                json_data.seekTime = Math.max(0, Math.min(mediaState.media.duration || 0, json_data.seekTime + delta));
                 useAudio.seek();
                 break;
             case "volume":
-                main_media.media.volume -= delta * 0.02;
+                mediaState.media.volume = Math.max(0, Math.min(1, mediaState.media.volume - delta * 0.02));
                 useAudio.setVol();
                 break;
             case "rate":
-                main_media.media.playbackRate -= delta * 0.05;
+                mediaState.media.playbackRate = Math.max(0.5, Math.min(3, mediaState.media.playbackRate - delta * 0.05));
                 useAudio.setRate();
                 break;
             default:
@@ -126,20 +124,20 @@
             <input
                 type="range"
                 min="0"
-                max={main_media.media.duration}
+                max={mediaState.media.duration}
                 step="0.1"
                 bind:value={json_data.seekTime}
                 oninput={() => useAudio.seek()}
                 onwheel={(e) => handleWheel("seek", e)}
             />
             <p class="setRight">
-                {formatTime(json_data.seekTime)} / {formatTime(main_media.media.duration)}
+                {formatTime(json_data.seekTime)} / {formatTime(mediaState.media.duration)}
             </p>
         </div>
 
         <div style="display: flex; align-items: center; gap: 10px;">
             <button class="nmorph_button" onclick={togglePlayback}>
-                {#if main_media.media.isPlaying}
+                {#if mediaState.media.isPlaying}
                     <span class="material-symbols-outlined"> pause </span>
                 {:else}
                     <span class="material-symbols-outlined"> play_arrow </span>
@@ -148,26 +146,26 @@
 
             <label>
                 音量：
-                <CustomSlider min="0" max="1" step="0.01" bind:value={main_media.media.volume} oninput={() => useAudio.setVol()}></CustomSlider>
-                <span style="display: inline-block;width: 40px;">{main_media.media.volume.toFixed(2)}</span>
+                <CustomSlider min="0" max="1" step="0.01" bind:value={mediaState.media.volume} oninput={() => useAudio.setVol()}></CustomSlider>
+                <span style="display: inline-block;width: 40px;">{mediaState.media.volume.toFixed(2)}</span>
             </label>
 
             <label>
                 倍速：
-                <CustomSlider min="0.5" max="3.0" step="0.05" bind:value={main_media.media.playbackRate} oninput={() => useAudio.setRate()}></CustomSlider>
-                <span style="display: inline-block;width: 40px;">{main_media.media.playbackRate.toFixed(2)}</span>
+                <CustomSlider min="0.5" max="3.0" step="0.05" bind:value={mediaState.media.playbackRate} oninput={() => useAudio.setRate()}></CustomSlider>
+                <span style="display: inline-block;width: 40px;">{mediaState.media.playbackRate.toFixed(2)}</span>
             </label>
 
             <div style="flex: 0 1 auto;">
                 <button class="nmorph_button"
-                    disabled={main_media.media.image_data.currentId <= 0}
+                    disabled={mediaState.media.image_data.currentId <= 0}
                     onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
                 画像
                 <button class="nmorph_button"
-                    disabled={main_media.media.image_data.currentId >= (imageTrack?.data.length ?? 1) - 1}
+                    disabled={mediaState.media.image_data.currentId >= (imageTrack?.data.length ?? 1) - 1}
                     onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
                 <label class="toggle_switch" title="画像自動切り替え" style="margin: 0 5px; vertical-align: middle;">
-                    <input type="checkbox" bind:checked={useState.is_image_auto} style="visibility: hidden;" />
+                    <input type="checkbox" bind:checked={uiState.imageAuto} style="visibility: hidden;" />
                     <span class="toggle-slider"></span>
                 </label>
             </div>

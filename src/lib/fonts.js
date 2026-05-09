@@ -1,4 +1,16 @@
 
+const webFonts = [
+    'Zen Maru Gothic',
+    'Kiwi Maru',
+    'Mochiy Pop One',
+    'Mochiy Pop P One',
+    'Kaisei Decol',
+];
+
+export function getWebFonts() {
+    return webFonts;
+}
+
 export function getProportionalFonts() {
     return [
         'ＭＳ Ｐゴシック',

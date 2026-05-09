@@ -1,14 +1,14 @@
 <script>
-    import { main_media, useState, useAudio } from "../lib/store.svelte";
+    import { mediaState, uiState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
     import { onMount, onDestroy } from "svelte";
 
     let { id = $bindable() } = $props();
     //   data = [{startSec:s,endSec:n,text:str}]
-    const duration = $derived(main_media.media.duration);
-    const data = $derived(main_media.media.srt_data[id]?.data ?? []);
+    const duration = $derived(mediaState.media.duration);
+    const data = $derived(mediaState.media.srt_data[id]?.data ?? []);
 
-    let zoomRatio = $derived(useState.timeLineRatio * useState.timeLineRatio);
+    let zoomRatio = $derived(uiState.timeLineRatio * uiState.timeLineRatio);
     let isDragging = $state(false);
     let dragStartX = $state(0);
     let draggedClipIndex = $state(-1);
@@ -29,12 +29,16 @@
             const deltaX = (event.clientX - dragStartX) / zoomRatio;
             const currentClip = data[draggedClipIndex];
             const nextClip = data[draggedClipIndex + 1];
+            if (!currentClip || !nextClip) return;
 
             // 境界の更新
             if (draggingEdge === "end" && draggedClipIndex < data.length - 1) {
-                currentClip.endTime += deltaX;
-                currentClip.endTimeStr = convSecToStr(currentClip.endTime);
-                nextClip.startTime += deltaX;
+                const min = currentClip.startTime;
+                const max = nextClip.endTime;
+                const nextTime = Math.max(min, Math.min(max, currentClip.endTime + deltaX));
+                currentClip.endTime = nextTime;
+                currentClip.endTimeStr = convSecToStr(nextTime);
+                nextClip.startTime = nextTime;
                 nextClip.startTimeStr = convSecToStr(nextClip.startTime);
             }
             dragStartX = event.clientX;

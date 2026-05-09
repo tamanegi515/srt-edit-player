@@ -59,11 +59,12 @@ export async function saveFile(dirHandle, name, text, subdir = null) {
 
 
 export async function getFileFromPath(dirHandle, path) {
-    if (!dirHandle) {
-        console.warn("dirHandle is not set. Please select a folder first.");
+    if (!dirHandle || !path) {
         return null;
     }
-    const parts = path.split("/").filter(Boolean); // 空文字を除く
+    const normalizedPath = String(path).replace(/\\/g, "/");
+    const parts = normalizedPath.split("/").filter(Boolean); // 空文字を除く
+    if (parts.length === 0) return null;
     let currentHandle = dirHandle;
 
     for (let i = 0; i < parts.length - 1; i++) {

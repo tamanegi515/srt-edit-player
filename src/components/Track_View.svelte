@@ -1,11 +1,11 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import Track from "./Track.svelte";
-    import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
+    import { mediaState, projectState, uiState, useAudio, useRefs } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
 
     // let tracks = $state(getSampleTracks());
-    let tracks = $derived(main_media.media.srt_data);
+    let tracks = $derived(mediaState.media.srt_data);
     const sumTrackHeight = $derived.by(() => {
         return tracks.reduce((sum, track) => sum + track.height, 0);
     });
@@ -38,7 +38,7 @@
         window.removeEventListener("mouseup", stopResizing);
     });
     let timeLineRef = $state();
-    // 拡大率は useState.timeLineRatio で一元管理
+    // 拡大率は uiState.timeLineRatio で一元管理
     let intervals = $state([
         [100, 500, 1000, 10000],
         [1000, 5000, 10000, 60000],
@@ -46,7 +46,7 @@
         [60000, 300000, 600000, 3600000],
     ]);
     let duration = $state(3600000);
-    let pixel_per_msec = $derived((useState.timeLineRatio * useState.timeLineRatio) / 1000);
+    let pixel_per_msec = $derived((uiState.timeLineRatio * uiState.timeLineRatio) / 1000);
     let offsetX = $state(0);
     let canvas;
     function panelScroll(e) {
@@ -54,7 +54,7 @@
         // console.log(offsetX);
     }
     function scrollTimeLine() {
-        const currentTime = main_media.json_data_list[main_media.media_index].seekTime * 1000;
+        const currentTime = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000;
         const currentX = currentTime * pixel_per_msec;
         const containerWidth = timeLineRef.clientWidth;
         if (timeLineRef) {
@@ -62,7 +62,7 @@
         }
     }
     $effect(() => {
-        if (useState.timeLineAuto) {
+        if (uiState.timeLineAuto) {
             scrollTimeLine();
         }
     });
@@ -86,7 +86,7 @@
 
         const currentyStart = height;
         const currentyEnd = 0;
-        const currentTime = main_media.json_data_list[main_media.media_index].seekTime * 1000;
+        const currentTime = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000;
         const currentX = currentTime * pixel_per_msec + 0.5 - offsetX;
         ctx.strokeStyle = "#FF0000";
         ctx.lineWidth = 2;
@@ -150,10 +150,10 @@
 </script>
 
 <div bind:this = {useRefs.trackRef}>
-    拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={useState.timeLineRatio} />
+    拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
     AutoScroll：
     <label class="toggle_switch" style="margin-right: 5px;">
-        <input type="checkbox" bind:checked={useState.timeLineAuto} style="visibility: hidden;" />
+        <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
         <span class="toggle-slider"></span>
     </label>
     <button class="nmorph_button" onclick={scrollTimeLine}>
@@ -182,7 +182,7 @@
                         const rect = timeLineRef.getBoundingClientRect();
                         const clickX = e.clientX - rect.left + timeLineRef.scrollLeft;
                         const time = clickX / pixel_per_msec / 1000;
-                        const duration = main_media.media.duration;
+                        const duration = mediaState.media.duration;
                         useAudio.seek(Math.max(0, Math.min(time, duration)));
                     }}
                     style:cursor="pointer"

@@ -213,8 +213,8 @@
         <div class="picker-row">
             <!-- 色選択のcanvas -->
             <div class="container">
-                <canvas bind:this={canvasRef} width={pickerSize.width} height={pickerSize.height} onpointerdown={handlePointerDown} onpointermove={handlePointerMove} onpointerup={handlePointerUp} />
-                <div class="picker" style="left: {position.x}px; top: {position.y}px;" />
+                <canvas bind:this={canvasRef} width={pickerSize.width} height={pickerSize.height} onpointerdown={handlePointerDown} onpointermove={handlePointerMove} onpointerup={handlePointerUp}></canvas>
+                <div class="picker" style="left: {position.x}px; top: {position.y}px;"></div>
             </div>
             <!-- Alphaバー -->
             <div class="bar-wrapper">

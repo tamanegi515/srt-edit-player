@@ -1,140 +1,116 @@
-<script>
-    import { onDestroy, onMount, tick } from "svelte";
-    import { main_media, useStyleList, useState } from "../lib/store.svelte";
+﻿<script>
+    import { onDestroy, onMount } from "svelte";
+    import {
+        mediaState,
+        projectState,
+        selectionState,
+        selectOverlayTrack,
+        selectStyle,
+        uiState,
+        useStyleList,
+    } from "../lib/store.svelte";
     import { calculate_shadow, getCurrentText } from "../lib/data_process";
 
-    let { index, scale = $bindable(), pos = $bindable() } = $props();
-    // let isVisibleBox = $state(false);
-    let srt = $derived(main_media.media.srt_data[index]);
-    let json_data = $derived(main_media.json_data_list[main_media.media_index]);
+    let { index, scale, pos } = $props();
+    let srt = $derived(mediaState.media.srt_data[index]);
+    let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
     let outboxRef = $state();
     let inboxRef = $state();
     let inboxSize = $state({ width: 0, height: 0 });
     let style_list = useStyleList();
 
     let observer;
-
+    const minBoxSize = 20;
     let dragStart = { x: 0, y: 0 };
     let itemStart = { x: 0, y: 0, w: 0, h: 0 };
     let isResizing = false;
     let isMoving = false;
-    let handlePoint = { horizon: "", vertival: "" };
-    let move_target = "out";
+    let handlePoint = { horizon: null, vertical: null };
+    let moveTarget = "out";
 
-    let spans = $derived(formatForDisplayParts(getCurrentText(srt.data, json_data.seekTime).text));
+    let currentText = $derived(getCurrentText(srt?.data ?? [], json_data.seekTime));
+    let sentences = $derived(formatForDisplaySentences(currentText.entry, currentText.text));
 
-    // function wrapTextWithLineBreaks(text, tag) {
-    //     const lines = text.split(/\r?\n/); // 改行で分割
-    //     const spans = lines.map((line) => {
-    //         return `<span class="srt_text" data-tag="${tag}" style="${setParam(tag)}" data-text="${line}">${line}</span>`;
-    //     });
-    //     return spans.join("<br>");
-    // }
+    function formatForDisplaySentences(entry, fallbackText) {
+        const defaultTag = json_data.scriptFiles?.[srt.id]?.defaultStyle || "default";
+        let activeTag = defaultTag;
+        const toDisplaySentence = (sentence, index) => {
+            const parsed = formatForDisplayParts(sentence, activeTag, defaultTag);
+            activeTag = parsed.activeTag;
+            return {
+                gap: index > 0,
+                parts: parsed.parts,
+            };
+        };
 
-    // // テキストからHTML装飾へ（表示用）
-    // function formatForDisplay(raw) {
-    //     if (!raw) return "";
-
-    //     // エスケープ
-    //     let escaped = raw.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    //     // escaped = escaped.replace(/\n/g, "<br>");
-    //     // タグ付き部分を先に変換（仮置き）
-    //     const tagged = [];
-    //     escaped = escaped.replace(/&lt;([\w-]+)&gt;([\s\S]*?)&lt;\/&gt;/g, (_, tag, content) => {
-    //         // const span = `<span class="srt_text" data-tag="${tag}" style="${setParam(tag)}" data-text="${content}">${content}</span>`;
-    //         const span = wrapTextWithLineBreaks(content, tag);
-    //         tagged.push(span);
-    //         return `__TAGGED__${tagged.length - 1}__`;
-    //     });
-
-    //     // 残った部分を default1 でラップ
-    //     const parts = escaped.split(/__TAGGED__(\d+)__/);
-    //     const result = parts
-    //         .map((part, i) => {
-    //             if (i % 2 === 1) {
-    //                 return tagged[+part]; // 数字のインデックス
-    //             } else {
-    //                 return part ? wrapTextWithLineBreaks(part, json_data.srtFiles?.[srt.id].defaultStyle) : "";
-    //             }
-    //         })
-    //         .join("");
-    //     console.log(result);
-    //     return result;
-    // }
-
-    function formatForDisplayParts(raw) {
-        if (!raw) return [];
-        // console.log(raw);
-        let escaped = raw.replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        const tagged = [];
-        escaped = escaped.replace(/&lt;([\w-]+)&gt;([\s\S]*?)&lt;\/&gt;/g, (_, tag, content) => {
-            tagged.push({ tag, text: content });
-            return `__TAGGED__${tagged.length - 1}__`;
-        });
-        const parts = escaped.split(/__TAGGED__(\d+)__/);
-        const result = parts.flatMap((part, i) => {
-            const isTagged = i % 2 === 1;
-            const { tag, text } = isTagged ? tagged[+part] : { tag: json_data.srtFiles?.[srt.id].defaultStyle || "default", text: part };
-
-            // 改行で分割
-            let lines = text.split(/\r?\n/);
-
-            // タグなしの場合だけ前後の不要な空要素を除去
-            if (!isTagged) {
-                // 先頭
-                if (lines[0] === "") lines.shift();
-                // 末尾
-                if (lines[lines.length - 1] === "") lines.pop();
-            }
-
-            // 中の空行は残す
-            // return lines.map((line) => ({ tag, text: line }));
-            return lines.map((line) => {
-                // 「ん゛」「つ゛」などを「゛ん」「゛つ」に見せる処理（縦書き用）
-                const transformed = line.replace(/([んつくふへあおうえやゆよワヲンアイウエオカ-モヤユヨラ-ロ])([゛゜])/g, "$2$1");
-                return { tag, text: transformed };
-            });
-        });
-        // console.log(result);
-        return result;
+        if (Array.isArray(entry?.sentences) && entry.sentences.length) {
+            return entry.sentences.map(toDisplaySentence);
+        }
+        const paragraphLines = String(fallbackText ?? "").split("\r\n");
+        return paragraphLines
+            .filter((line, index) => line !== "" || index !== 0 && index !== paragraphLines.length - 1)
+            .map(toDisplaySentence);
     }
 
-    function handleTextClick(tag) {
-        console.log(tag);
-        if (!tag) return;
-        const index = style_list.findIndex((item) => item.name === tag);
-        main_media.currentStyle = index;
+    function formatForDisplayParts(raw, initialTag, defaultTag) {
+        const text = String(raw ?? "");
+        const parts = [];
+        const tokenPattern = /<\/>|<([\w-]+)>/g;
+        let activeTag = initialTag || defaultTag;
+        let cursor = 0;
+        let match;
+
+        while ((match = tokenPattern.exec(text))) {
+            if (match.index > cursor) {
+                parts.push({ tag: activeTag, text: toCombiningVoiceMarks(text.slice(cursor, match.index)) });
+            }
+            activeTag = match[0] === "</>" || !json_data.styles?.[match[1]] ? defaultTag : match[1];
+            cursor = match.index + match[0].length;
+        }
+        if (cursor < text.length) {
+            parts.push({ tag: activeTag, text: toCombiningVoiceMarks(text.slice(cursor)) });
+        }
+        return { parts, activeTag };
+    }
+
+    function toCombiningVoiceMarks(text) {
+        return text.replace(/([ぁ-ゖァ-ヺ])([゛゜])/g, (_, char, mark) => {
+            return `${char}${mark === "゛" ? "\u3099" : "\u309A"}`;
+        });
+    }
+
+    function selectTrackAndStyle(tag) {
+        if (!srt) return;
+        selectOverlayTrack(srt.id, tag);
+        if (tag && style_list.some((item) => item.name === tag)) selectStyle(tag);
     }
 
     // 表示位置とサイズを設定するための関数
     function setPosition() {
-        const srt_file = json_data.srtFiles?.[srt.id];
+        const srt_file = json_data.scriptFiles?.[srt.id];
         if (!srt_file) return "";
         const scaleX = 1;
         const scaleY = 1;
         const styletext = `
-            --box_left: ${pos.x + srt_file.x * scale.w}px;
-            --box_top: ${pos.y + srt_file.y * scale.h}px;
+            --box_left: ${(pos?.x ?? 0) + srt_file.x * (scale?.w ?? 1)}px;
+            --box_top: ${(pos?.y ?? 0) + srt_file.y * (scale?.h ?? 1)}px;
             --box_width: ${srt_file.maxWidth}px;
             --box_height: ${srt_file.maxHeight}px;
-            --scale_x: ${scale.w};
-            --scale_y: ${scale.h};
+            --scale_x: ${scale?.w ?? 1};
+            --scale_y: ${scale?.h ?? 1};
             --txt_rotate: ${srt_file.textRotate};
             --txt_align: ${srt_file.textAlign};
         `;
-        // console.log(styletext);
         return styletext;
     }
 
     function setAlign() {
-        const srt_file = json_data.srtFiles?.[srt.id];
+        const srt_file = json_data.scriptFiles?.[srt.id];
         if (!srt_file) return "";
 
         const alignX = ((srt_file.maxWidth - inboxSize.width) * srt_file.boxAlignX) / 100;
         const alignY = ((srt_file.maxHeight - inboxSize.height) * srt_file.boxAlignY) / 100;
 
-        // console.log("H:  ",srt_file.max_height,"    ",inboxSize.height);
-        // console.log("W:  ",srt_file.max_width,"    ",inboxSize.width);
         return `
         --box_align_x: ${alignX}px;
         --box_align_y: ${alignY}px;
@@ -142,7 +118,8 @@
     }
     // 表示スタイルを反映する関数
     function setParam(tag_key) {
-        const style = json_data.styles[tag_key];
+        const style = json_data.styles[tag_key] ?? Object.values(json_data.styles)[0];
+        if (!style) return "";
         const outline1size = style.outline1.enable ? style.outline1.size : 0;
         const outline2size = style.outline2.enable ? style.outline2.size + outline1size : 0;
 
@@ -160,10 +137,8 @@
             --out2_color: ${style.outline2.color};
             --out2_x: ${style.outline2.offsetX}px;
             --out2_y: ${style.outline2.offsetY}px;
-            --shadow_color: ${style.shadow.color};
-            --drop_shadow:${calculate_shadow(style.shadow)};
+            --shadow_text:${calculate_shadow(style.shadow)};
         `;
-        // console.log(style.shadow);
         return tagtext;
     }
 
@@ -176,140 +151,122 @@
         }
     }
 
-    //字幕箱のリサイズ
-    const resizeDragStart = (e, horizon, vertical) => {
+    function currentSrtFile() {
+        return json_data.scriptFiles?.[srt?.id];
+    }
+
+    function clampBoxSize(value) {
+        return Math.max(minBoxSize, value);
+    }
+
+    function resizeDragStart(e, horizon, vertical) {
         e.preventDefault();
         e.stopPropagation();
+        const srt_file = currentSrtFile();
+        if (!srt_file) return;
+        selectTrackAndStyle(srt_file.defaultStyle);
         outboxRef?.focus();
-        const srt_file = json_data.srtFiles?.[srt.id];
         isResizing = true;
-        dragStart.x = e.clientX;
-        dragStart.y = e.clientY;
-        itemStart.x = srt_file.x;
-        itemStart.y = srt_file.y;
-        itemStart.w = srt_file.maxWidth;
-        itemStart.h = srt_file.maxHeight;
-
-        handlePoint.horizon = horizon;
-        handlePoint.vertical = vertical;
+        dragStart = { x: e.clientX, y: e.clientY };
+        itemStart = { x: srt_file.x, y: srt_file.y, w: srt_file.maxWidth, h: srt_file.maxHeight };
+        handlePoint = { horizon, vertical };
         window.addEventListener("mousemove", handleResizing);
         window.addEventListener("mouseup", stopResize);
+    }
 
-        const cancelClick = (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            stopResize();
-            window.removeEventListener("click", cancelClick, true); // once
-        };
-        window.addEventListener("click", cancelClick, true);
-    };
     function handleResizing(e) {
         e.preventDefault();
         e.stopPropagation();
         if (!isResizing) return;
-        const srt_file = json_data.srtFiles?.[srt.id];
+        const srt_file = currentSrtFile();
+        if (!srt_file) return;
+        const scaleW = scale?.w || 1;
+        const scaleH = scale?.h || 1;
+        const offsetX = (e.clientX - dragStart.x) / scaleW;
+        const offsetY = (e.clientY - dragStart.y) / scaleH;
 
-        const offsetX = e.clientX - dragStart.x;
-        const offsetY = e.clientY - dragStart.y;
-        // 表示されるテキストの位置を更新
-        if (handlePoint.vertical == null && handlePoint.horizon == null) {
-            srt_file.x = itemStart.x + offsetX / scale.w;
-            srt_file.y = itemStart.y + offsetY / scale.h;
-        }
-
-        // topのリサイズの処理
         if (handlePoint.vertical === "top") {
-            srt_file.y = itemStart.y + offsetY / scale.h;
-            srt_file.maxHeight = itemStart.h - offsetY / scale.h;
+            const height = clampBoxSize(itemStart.h - offsetY);
+            srt_file.y = itemStart.y + (itemStart.h - height);
+            srt_file.maxHeight = height;
         }
-
-        // bottomのリサイズ処理
         if (handlePoint.vertical === "bottom") {
-            srt_file.maxHeight = itemStart.h + offsetY / scale.h;
+            srt_file.maxHeight = clampBoxSize(itemStart.h + offsetY);
         }
-
-        // leftのリサイズ処理
         if (handlePoint.horizon === "left") {
-            srt_file.maxWidth = itemStart.w - offsetX / scale.w;
-            srt_file.x = itemStart.x + offsetX / scale.w;
+            const width = clampBoxSize(itemStart.w - offsetX);
+            srt_file.x = itemStart.x + (itemStart.w - width);
+            srt_file.maxWidth = width;
         }
-
-        // rightのリサイズ処理
         if (handlePoint.horizon === "right") {
-            srt_file.maxWidth = itemStart.w + offsetX / scale.w;
+            srt_file.maxWidth = clampBoxSize(itemStart.w + offsetX);
         }
     }
 
     function stopResize() {
         isResizing = false;
-        handlePoint.vertical = null;
-        handlePoint.horizon = null;
+        handlePoint = { horizon: null, vertical: null };
         window.removeEventListener("mousemove", handleResizing);
         window.removeEventListener("mouseup", stopResize);
     }
 
-    const moveDragStart = (e, target) => {
+    function moveDragStart(e, target, styleKey = null) {
         e.preventDefault();
         e.stopPropagation();
+        const srt_file = currentSrtFile();
+        if (!srt_file || isResizing) return;
+        selectTrackAndStyle(styleKey ?? srt_file.defaultStyle);
         outboxRef?.focus();
-        const srt_file = json_data.srtFiles?.[srt.id];
-        main_media.currentSrt = srt.id;
-        if (isResizing) {
-            console.log("return because resizing");
-            return;
-        }
         isMoving = true;
-        dragStart.x = e.clientX;
-        dragStart.y = e.clientY;
-        move_target = target;
-        if (move_target == "out") {
-            itemStart.x = srt_file.x;
-            itemStart.y = srt_file.y;
-        }
-        if (move_target == "in") {
-            // main_media.currentStyle = style_list.findIndex((item) => item.name === srt_file.defaultStyle);
-            itemStart.x = ((srt_file.maxWidth - inboxSize.width) * srt_file.boxAlignX) / 100;
-            itemStart.y = ((srt_file.maxHeight - inboxSize.height) * srt_file.boxAlignY) / 100;
+        moveTarget = target;
+        dragStart = { x: e.clientX, y: e.clientY };
+        if (target === "out") {
+            itemStart = { x: srt_file.x, y: srt_file.y, w: srt_file.maxWidth, h: srt_file.maxHeight };
+        } else {
+            itemStart = {
+                x: ((srt_file.maxWidth - inboxSize.width) * srt_file.boxAlignX) / 100,
+                y: ((srt_file.maxHeight - inboxSize.height) * srt_file.boxAlignY) / 100,
+                w: srt_file.maxWidth,
+                h: srt_file.maxHeight,
+            };
         }
         window.addEventListener("mousemove", handleMove);
         window.addEventListener("mouseup", stopMove);
+    }
 
-        const cancelClick = (ev) => {
-            ev.preventDefault();
-            ev.stopPropagation();
-            stopMove();
-            window.removeEventListener("click", cancelClick, true); // once
-        };
-        window.addEventListener("click", cancelClick, true);
-    };
     function handleMove(e) {
         e.preventDefault();
         e.stopPropagation();
         if (!isMoving) return;
-        const srt_file = json_data.srtFiles?.[srt.id];
+        const srt_file = currentSrtFile();
+        if (!srt_file) return;
+        const scaleW = scale?.w || 1;
+        const scaleH = scale?.h || 1;
+        const offsetX = (e.clientX - dragStart.x) / scaleW;
+        const offsetY = (e.clientY - dragStart.y) / scaleH;
 
-        // 表示されるテキストの位置を更新
-        if (move_target == "out") {
-            const offsetX = (e.clientX - dragStart.x) / scale.w;
-            const offsetY = (e.clientY - dragStart.y) / scale.h;
+        if (moveTarget === "out") {
             srt_file.x = itemStart.x + offsetX;
             srt_file.y = itemStart.y + offsetY;
+            return;
         }
-        if (move_target == "in") {
-            const offsetX = (e.clientX - dragStart.x) / scale.w;
-            const offsetY = (e.clientY - dragStart.y) / scale.h;
-            srt_file.boxAlignX = Math.min(100, Math.max(1, Math.round(((itemStart.x + offsetX) / (srt_file.maxWidth - inboxSize.width)) * 100)));
-            srt_file.boxAlignY = Math.min(100, Math.max(1, Math.round(((itemStart.y + offsetY) / (srt_file.maxHeight - inboxSize.height)) * 100)));
+
+        const rangeX = srt_file.maxWidth - inboxSize.width;
+        const rangeY = srt_file.maxHeight - inboxSize.height;
+        if (rangeX > 0) {
+            srt_file.boxAlignX = Math.max(0, Math.min(100, Math.round(((itemStart.x + offsetX) / rangeX) * 100)));
+        }
+        if (rangeY > 0) {
+            srt_file.boxAlignY = Math.max(0, Math.min(100, Math.round(((itemStart.y + offsetY) / rangeY) * 100)));
         }
     }
 
     function stopMove() {
         isMoving = false;
-        handlePoint.vertical = null;
-        handlePoint.horizon = null;
         window.removeEventListener("mousemove", handleMove);
         window.removeEventListener("mouseup", stopMove);
     }
+
     onMount(() => {
         if (inboxRef) {
             observer = new ResizeObserver(updateInboxSize);
@@ -322,112 +279,127 @@
         if (observer && inboxRef) {
             observer.unobserve(inboxRef);
         }
+        stopMove();
+        stopResize();
     });
 </script>
 
-<div class="srt_box {useState.view_srt_frame ? 'box_visible' : ''}" tabindex="0" bind:this={outboxRef} style={setPosition()} onmousedown={(e) => moveDragStart(e, "out")}>
-    <div class="srt_inbox" bind:this={inboxRef} style={setAlign()} onmousedown={(e) => moveDragStart(e, "in")}>
+<div class="srt_box {uiState.viewSrtFrame ? 'box_visible' : ''} {selectionState.selectedTrackId === srt?.id ? 'box_selected' : ''} {currentText.text ? '' : 'box_empty'}" tabindex="0" bind:this={outboxRef} style={setPosition()} onmousedown={(e) => moveDragStart(e, "out")} onclick={(e) => e.stopPropagation()}>
+    <div class="srt_inbox" bind:this={inboxRef} style={setAlign()} onmousedown={(e) => moveDragStart(e, "in")} onclick={(e) => e.stopPropagation()}>
         <div>
-            {#each spans as part}
-                <span class="srt_text" style={setParam(part.tag)} data-tag={part.tag} data-text={part.text} onmousedown={(e) => handleTextClick(part.tag)}>
-                    {part.text}<br />
+            {#each sentences as sentence}
+                <span class="srt_sentence {sentence.gap ? 'sentence_gap' : ''}" style={setParam(json_data.scriptFiles?.[srt.id]?.defaultStyle)}>
+                    {#each sentence.parts as part}
+                        <span
+                            class="srt_text"
+                            style={setParam(part.tag)}
+                            data-tag={part.tag}
+                            data-text={part.text}
+                            onmousedown={(e) => {
+                                moveDragStart(e, "in", part.tag);
+                            }}
+                            onclick={(e) => e.stopPropagation()}
+                        >
+                            <span class="srt_layer srt_shadow" aria-hidden="true">{part.text}</span>
+                            <span class="srt_layer srt_outline2" aria-hidden="true">{part.text}</span>
+                            <span class="srt_content">{part.text}</span>
+                        </span>
+                    {/each}
                 </span>
             {/each}
         </div>
     </div>
-    <span class="top" onmousedown={(e) => resizeDragStart(e, null, "top")}></span>
-    <span class="bottom" onmousedown={(e) => resizeDragStart(e, null, "bottom")}></span>
-    <span class="left" onmousedown={(e) => resizeDragStart(e, "left", null)}></span>
-    <span class="right" onmousedown={(e) => resizeDragStart(e, "right", null)}></span>
-    <span class="tleft" onmousedown={(e) => resizeDragStart(e, "left", "top")}></span>
-    <span class="tright" onmousedown={(e) => resizeDragStart(e, "right", "top")}></span>
-    <span class="bleft" onmousedown={(e) => resizeDragStart(e, "left", "bottom")}></span>
-    <span class="bright" onmousedown={(e) => resizeDragStart(e, "right", "bottom")}></span>
+    <span class="resize-handle top" onmousedown={(e) => resizeDragStart(e, null, "top")} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle bottom" onmousedown={(e) => resizeDragStart(e, null, "bottom")} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle left" onmousedown={(e) => resizeDragStart(e, "left", null)} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle right" onmousedown={(e) => resizeDragStart(e, "right", null)} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle tleft" onmousedown={(e) => resizeDragStart(e, "left", "top")} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle tright" onmousedown={(e) => resizeDragStart(e, "right", "top")} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle bleft" onmousedown={(e) => resizeDragStart(e, "left", "bottom")} onclick={(e) => e.stopPropagation()}></span>
+    <span class="resize-handle bright" onmousedown={(e) => resizeDragStart(e, "right", "bottom")} onclick={(e) => e.stopPropagation()}></span>
 </div>
 
 <style>
+    .resize-handle {
+        position: absolute;
+        display: block;
+        z-index: 50;
+        background: rgba(0, 255, 255, 0.18);
+        border: 1px solid rgba(0, 255, 255, 0.55);
+        box-sizing: border-box;
+    }
     .top {
-        position: absolute;
         top: 0;
-        right: 5px;
-        left: 5px;
-        height: 5px;
+        right: 8px;
+        left: 8px;
+        height: 8px;
         cursor: ns-resize;
     }
-
     .bottom {
-        position: absolute;
         bottom: 0;
-        right: 5px;
-        left: 5px;
-        height: 5px;
+        right: 8px;
+        left: 8px;
+        height: 8px;
         cursor: ns-resize;
     }
-
     .left {
-        position: absolute;
-        top: 5px;
-        bottom: 5px;
+        top: 8px;
+        bottom: 8px;
         left: 0;
-        width: 5px;
+        width: 8px;
         cursor: ew-resize;
     }
-
     .right {
-        position: absolute;
-        top: 5px;
+        top: 8px;
         right: 0;
-        bottom: 5px;
-        width: 5px;
+        bottom: 8px;
+        width: 8px;
         cursor: ew-resize;
     }
-
-    .tleft {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 5px;
-        height: 5px;
-        cursor: nwse-resize;
-    }
-
-    .tright {
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 5px;
-        height: 5px;
-        cursor: nesw-resize;
-    }
-
-    .bleft {
-        position: absolute;
-        bottom: 0;
-        left: 0;
-        width: 5px;
-        height: 5px;
-        cursor: nesw-resize;
-    }
-
+    .tleft,
+    .tright,
+    .bleft,
     .bright {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        width: 5px;
-        height: 5px;
+        width: 14px;
+        height: 14px;
+    }
+    .tleft {
+        top: 0;
+        left: 0;
         cursor: nwse-resize;
     }
-
+    .tright {
+        top: 0;
+        right: 0;
+        cursor: nesw-resize;
+    }
+    .bleft {
+        bottom: 0;
+        left: 0;
+        cursor: nesw-resize;
+    }
+    .bright {
+        right: 0;
+        bottom: 0;
+        cursor: nwse-resize;
+    }
+    .srt_box:not(.box_visible):not(.box_selected) .resize-handle {
+        display: none;
+    }
+    .srt_box.box_empty:not(.box_selected) {
+        pointer-events: none;
+    }
     .box_visible,
-    .srt_box:focus {
+    .box_selected {
         outline-offset: -5px;
         outline: 5px solid rgba(0, 255, 255, 0.418);
         background-color: rgba(0, 255, 255, 0.11);
     }
     .box_visible .srt_inbox,
-    .srt_box:focus .srt_inbox {
+    .box_selected .srt_inbox {
         outline-offset: -2px;
         outline: 3px solid rgba(255, 230, 0, 0.418);
         background-color: rgba(17, 0, 255, 0.13);
     }
 </style>
+

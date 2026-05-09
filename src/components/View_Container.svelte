@@ -1,19 +1,18 @@
 <script>
-    import { scale } from "svelte/transition";
     import SrtOverlay from "./SRT_Overlay.svelte";
-    import { onMount, onDestroy } from "svelte";
-    import { main_media, useRefs, useState, useAudio } from "../lib/store.svelte";
+    import { onDestroy } from "svelte";
+    import { clearOverlaySelection, mediaState, useRefs } from "../lib/store.svelte";
 
     let mousePercent = $state({ x: "0", y: "0" });
     let display_position = $state(false);
 
     function updateImageRect() {
         if (useRefs.imageRef && useRefs.imageRef.offsetParent) {
-            main_media.imageScale = {
+            mediaState.imageScale = {
                 w: useRefs.imageRef.clientWidth / useRefs.imageRef.naturalWidth,
                 h: useRefs.imageRef.clientHeight / useRefs.imageRef.naturalHeight,
             };
-            main_media.imageBaseScale = {
+            mediaState.imageBaseScale = {
                 h: useRefs.imageRef.clientHeight / 1080,
                 w: useRefs.imageRef.clientHeight / 1080,
             };
@@ -21,7 +20,7 @@
             const parentRect = useRefs.imageRef.offsetParent.getBoundingClientRect();
 
             // 親との相対位置
-            main_media.imagePos = {
+            mediaState.imagePos = {
                 x: imageRect.left - parentRect.left,
                 y: imageRect.top - parentRect.top,
             };
@@ -39,6 +38,12 @@
         };
     }
 
+    function clearSelectionFromViewer(event) {
+        if (event.target.closest?.(".srt_box")) return;
+        clearOverlaySelection();
+        document.activeElement?.blur?.();
+    }
+
 
     let observer;
     function setObserver() {
@@ -52,24 +57,24 @@
     }
 
     onDestroy(() => {
-        if (observer && useRefs.imageRef) {
-            observer.unobserve(useRefs.imageRef);
-        }
+        observer?.disconnect();
     });
 </script>
 
-<div class="media-container">
-    {#if main_media.media.image_data?.currentImage}
-        <img src={main_media.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
-        {#each main_media.media.srt_data as srt, index}
-            {#if !srt.isImageTrack}
-                <SrtOverlay index={index} bind:scale={main_media.imageBaseScale} bind:pos={main_media.imagePos}></SrtOverlay>
-            {/if}
-        {/each}
+<div class="media-container" onmousedown={clearSelectionFromViewer}>
+    {#if mediaState.media.image_data?.currentImage}
+        <img src={mediaState.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
+    {:else}
+        <div class="media-placeholder"></div>
     {/if}
+    {#each mediaState.media.srt_data as srt, index}
+        {#if !srt.isImageTrack}
+            <SrtOverlay index={index} scale={mediaState.imageBaseScale} pos={mediaState.imagePos}></SrtOverlay>
+        {/if}
+    {/each}
     {#if display_position}
         <div class="overlay-text">
-            X: {main_media.imageScale.w}% / Y: {main_media.imageScale.h}%
+            X: {mediaState.imageScale.w}% / Y: {mediaState.imageScale.h}%
         </div>
     {/if}
 </div>
@@ -94,6 +99,11 @@
         object-fit: contain;
         display: block;
         position: absolute;
+    }
+    .media-placeholder {
+        position: absolute;
+        inset: 0;
+        background: #050505;
     }
     .overlay-text {
         position: absolute;
