@@ -321,6 +321,63 @@ test("keeps loaded editor content inside the viewport above the timeline", async
   });
 });
 
+test("scroll button moves the subtitle editor to the current playback time", async ({ page }) => {
+  const manyClips = JSON.stringify(Array.from({ length: 40 }, (_, index) => ({
+    speaker: "",
+    start: `00:00:${String(index).padStart(2, "0")},000`,
+    end: `00:00:${String(index + 1).padStart(2, "0")},000`,
+    sentences: [`${index} スクロール確認用の字幕です。`],
+  })));
+
+  await page.setViewportSize({ width: 1663, height: 923 });
+  await page.addInitScript((jsonText) => {
+    const jsonEntry = {
+      kind: "file",
+      name: "scroll-test.json",
+      async getFile() {
+        return new File([jsonText], "scroll-test.json", { type: "application/json" });
+      },
+    };
+
+    window.showDirectoryPicker = async () => ({
+      name: "scroll-test-folder",
+      async requestPermission() {
+        return "granted";
+      },
+      async *values() {
+        yield jsonEntry;
+      },
+      async getFileHandle(name, options = {}) {
+        if (options.create) {
+          return {
+            async createWritable() {
+              return { async write() {}, async close() {} };
+            },
+          };
+        }
+        if (name === "scroll-test.json") return jsonEntry;
+        throw new DOMException(`Missing file: ${name}`, "NotFoundError");
+      },
+    });
+  }, manyClips);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".editor")).toHaveCount(40);
+  await page.locator(".bar-container input[type='range']").fill("20.5");
+
+  const before = await page.locator("[data-testid='editor-scroll']").evaluate((element) => element.scrollTop);
+  await page.getByRole("button", { name: "Scroll" }).click();
+  await expect.poll(() => page.locator("[data-testid='editor-scroll']").evaluate((element) => element.scrollTop)).toBeGreaterThan(before + 100);
+
+  await expect.poll(() => page.locator(".editor").nth(20).evaluate((target) => {
+    const container = target.closest("[data-testid='editor-scroll']");
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    return targetRect.top >= containerRect.top && targetRect.bottom <= containerRect.bottom;
+  })).toBe(true);
+});
+
 test("loads a sentences json folder with the rich editor state intact", async ({ page }) => {
   const consoleErrors = [];
   page.on("console", (message) => {

@@ -239,8 +239,8 @@
   }
 
   function scrollEditor() {
+    window.dispatchEvent(new CustomEvent("srt-editor-scroll-current", { detail: { time: json_data.seekTime } }));
     for (const ref of useRefs.editorRefs) {
-      console.log(ref);
       if (ref) {
         ref.scrollToIndex(json_data.seekTime);
       }

@@ -11,6 +11,7 @@
     import { getCurrentText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
     import CustomTextarea from "./Custom_Textarea.svelte";
+    import { onDestroy, onMount } from "svelte";
 
     let { parents_height = $bindable(), column, ...props } = $props();
 
@@ -18,6 +19,7 @@
     let selectedTrack = $derived(editableSrtFiles.find((track) => track.id === column.trackId) ?? editableSrtFiles[0]);
     let srt_data = $derived(selectedTrack?.data ?? []);
     let editorRefs = $state([]);
+    let editorScrollBox = $state();
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
 
     $effect(() => {
@@ -31,11 +33,21 @@
     let isProgrammaticScroll = false;
     export function scrollToIndex(time) {
         const index = getCurrentText(selectedTrack?.data ?? [], time).index;
+        const target = editorScrollBox?.querySelectorAll(".editor")?.[index];
+        if (index < 0 || !target || !editorScrollBox) return;
         isProgrammaticScroll = true;
-        editorRefs[index]?.scrollToIndex();
+        const targetRect = target.getBoundingClientRect();
+        const containerRect = editorScrollBox.getBoundingClientRect();
+        const targetTop = editorScrollBox.scrollTop + targetRect.top - containerRect.top;
+        const centeredTop = targetTop - (editorScrollBox.clientHeight - target.offsetHeight) / 2;
+        editorScrollBox.scrollTo({ top: Math.max(0, centeredTop), behavior: "smooth" });
         setTimeout(() => {
             isProgrammaticScroll = false;
-        }, 150);
+        }, 300);
+    }
+
+    function handleExternalScroll(event) {
+        scrollToIndex(event.detail?.time ?? json_data.seekTime);
     }
 
     function JumpAudio(index) {
@@ -72,6 +84,14 @@
     }
 
     let this_height = $derived.by(() => Math.max(120, parents_height - 130));
+
+    onMount(() => {
+        window.addEventListener("srt-editor-scroll-current", handleExternalScroll);
+    });
+
+    onDestroy(() => {
+        window.removeEventListener("srt-editor-scroll-current", handleExternalScroll);
+    });
 </script>
 
 <div class="srt-editor">
@@ -84,6 +104,7 @@
     </div>
     <div
         class="box"
+        bind:this={editorScrollBox}
         style="height: {this_height}px;"
         data-testid="editor-scroll"
         onscroll={() => {
