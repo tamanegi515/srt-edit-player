@@ -213,14 +213,16 @@
     flex-direction: column;
     min-height: 0;
     flex-shrink: 0; /* ワークスペースが縮む時にタイムラインの行が無言で潰れないようにする */
+    gap: 4px;
 }
 
 .track-controls {
     display: flex;
     align-items: center;
-    height: 28px;
-    gap: 5px;
+    min-height: 30px;
+    gap: 6px;
     white-space: nowrap;
+    color: #c4ced0;
 }
 
 .track-controls .nmorph_button {
@@ -236,42 +238,39 @@
 /* トラックビュー全体 */
 .track-view {
     display: grid;
-    background: var(--bg);
-    border-radius: 1px;
-    border: 2px solid var(--border-color);
+    background: #1b1d1f;
+    border-radius: 4px;
+    border: 1px solid #3a3f42;
     overflow: hidden;
 }
 
 /* 左パネル: ほぼフラット、ニューモーフィズム感はごく薄く */
 .left-panel {
-    background: var(--panel-bg);
-    border-right: 1px solid var(--border-color);
+    background: #1d2022;
+    border-right: 1px solid #3a3f42;
     color: var(--text-color);
 }
 
 /* 左パネルのトラックラベル: カードっぽく */
 .left-panel div {
     padding: 6px 10px;
-    background: linear-gradient(
-        160deg,
-        rgb(36, 36, 36) 0%,
-        rgb(22, 22, 22) 100%
-    );
-    border-bottom: 1px solid var(--border-color);
+    background: #202326;
+    border-bottom: 1px solid #32373a;
     line-height: 1;
     display: flex;
     align-items: center;
+    font-size: 13px;
 }
 
 /* リサイズバー: フラット */
 .track_resizer {
-    background: var(--border-color);
+    background: #33383b;
     cursor: ew-resize;
 }
 
 /* 右パネル: 背景に薄いニューモーフィズム感 */
 .right-panel {
-    background: var(--panel-bg);
+    background: #17191a;
     position: relative;
     min-width: 0;
     overflow: hidden; /* 再生ヘッド（.playhead）がスクロール時に左隣のパネルへはみ出さないようにする */
@@ -281,21 +280,22 @@
 .right-subpanel {
     display: grid;
     grid-template-columns: 1fr;
-    overflow-x: scroll;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 /* 各トラック: カード風のフラット */
 .track {
     grid-column-start: 1;
     grid-column-end: 2;
-    background: #2a2a2a;
-    border-radius: 6px;
-    border-bottom: 2px solid var(--border-color);
+    background: #25282a;
+    border-radius: 0;
+    border-bottom: 1px solid #353a3d;
 }
 
 /* 時間目盛キャンバス: シンプルな背景 */
 .tickmark {
-    background: var(--panel-bg);
+    background: #161819;
     position: absolute;
 }
 
@@ -305,8 +305,8 @@
     top: 0;
     left: 0;
     width: 2px;
-    height: 30px;
-    background: #ff0000;
+    height: 35px;
+    background: #ff3b30;
     pointer-events: none;
     z-index: 3;
     will-change: transform;

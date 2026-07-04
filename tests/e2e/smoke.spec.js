@@ -255,15 +255,24 @@ test("does not create page-level vertical scrolling in the empty project view", 
   await page.goto("/");
   await expect.poll(() => page.evaluate(() => {
     const root = document.scrollingElement || document.documentElement;
+    const editorColumns = document.querySelector(".editor-columns");
+    const emptyEditor = document.querySelector(".empty-editor-state");
+    const editorScrollBox = document.querySelector("[data-testid='editor-scroll']");
     return {
       rootOverflow: root.scrollHeight - root.clientHeight,
       bodyOverflow: document.body.scrollHeight - document.body.clientHeight,
       mainOverflowMode: getComputedStyle(document.querySelector("main")).overflow,
+      emptyEditorVisible: !!emptyEditor,
+      editorScrollBoxAbsent: !editorScrollBox,
+      editorColumnsOverflowX: editorColumns.scrollWidth - editorColumns.clientWidth,
     };
   })).toEqual({
     rootOverflow: 0,
     bodyOverflow: 0,
     mainOverflowMode: "hidden",
+    emptyEditorVisible: true,
+    editorScrollBoxAbsent: true,
+    editorColumnsOverflowX: 0,
   });
 });
 

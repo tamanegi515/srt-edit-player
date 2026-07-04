@@ -67,7 +67,11 @@
     {#if mediaState.media.image_data?.currentImage}
         <img src={mediaState.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
     {:else}
-        <div class="media-placeholder"><span>画像がありません</span></div>
+        <div class="media-placeholder">
+            <span class="material-symbols-outlined placeholder-icon">image</span>
+            <strong>画像がありません</strong>
+            <span>音声だけの編集、または字幕タイミングの確認はこのまま行えます。</span>
+        </div>
     {/if}
     {#each mediaState.media.srt_data as srt, index}
         {#if !srt.isImageTrack}
@@ -107,13 +111,29 @@
         inset: 0;
         background: #050505;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 8px;
+        padding: 24px;
+        text-align: center;
+        box-sizing: border-box;
+    }
+    .media-placeholder .placeholder-icon {
+        color: #2aa8a8;
+        font-size: 34px;
+        opacity: 0.8;
+    }
+    .media-placeholder strong {
+        color: #a8b2b5;
+        font-size: 15px;
+        font-weight: 600;
     }
     .media-placeholder span {
-        color: #5a5a5a;
-        font-size: 14px;
+        color: #727d80;
+        font-size: 13px;
         user-select: none;
+        line-height: 1.5;
     }
     .overlay-text {
         position: absolute;

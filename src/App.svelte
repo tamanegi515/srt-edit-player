@@ -46,6 +46,7 @@
     toastTimer = setTimeout(() => { toastMessage = ''; }, 3000);
   }
   let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
+  let showQuickStart = $derived(!projectState.dirHandle);
   let mediaLoadToken = 0;
   let newTrackName = $state("");
   let newTrackFormat = $state("json");
@@ -378,6 +379,20 @@
     </div>
   </header>
 
+  {#if showQuickStart}
+    <section class="quick-start" aria-label="使い方">
+      <div class="quick-start-title">
+        <span class="material-symbols-outlined">info</span>
+        <span>使い方</span>
+      </div>
+      <ol>
+        <li><span>1</span>フォルダを開く</li>
+        <li><span>2</span>メディアを選ぶ</li>
+        <li><span>3</span>字幕を編集して保存</li>
+      </ol>
+    </section>
+  {/if}
+
   {#if uiState.viewRibbon}
     <StyleRibbon></StyleRibbon>
   {/if}
@@ -399,7 +414,7 @@
 
       <!-- 右: 編集エリア（列の合計幅 totalWidth に左右パディング分を足した値を上限にし、
            プレイヤーとの取り合いで幅が足りない時は縮小＋内部横スクロールで収める） -->
-      <div class="srt_area" style="max-width: calc({totalWidth}px + 12px);">
+      <div class="srt_area" style="max-width: calc({totalWidth}px + 30px);">
         <div class="editor-toolbar">
           <button class="nmorph_button" title="列を減らす" aria-label="列を減らす" onclick={removeEditorColumn}>
             <span class="material-symbols-outlined"> chevron_left </span>
@@ -465,7 +480,8 @@
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 6px 14px;
+    gap: 6px 12px;
+    padding: 2px 0 4px;
   }
   .toolbar-group {
     display: flex;
@@ -483,9 +499,12 @@
     gap: 6px;
     cursor: pointer;
     white-space: nowrap;
+    color: #c5d0d2;
   }
   .toggle-field .head-text {
     margin: 0;
+    color: #27b1b5;
+    font-size: 14px;
   }
   .toggle_switch input {
     position: absolute;
@@ -499,6 +518,7 @@
   .media-select {
     min-width: 160px;
     max-width: 340px;
+    color: #dbe4e5;
     cursor: pointer;
   }
 
@@ -529,7 +549,9 @@
     flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    padding-bottom: 6px;
+    min-height: 42px;
+    padding: 2px 4px 8px;
+    border-bottom: 1px solid #313638;
   }
   .editor-toolbar .toolbar-spacer {
     flex: 1 1 auto;
@@ -565,9 +587,9 @@
   }
 
   .folder-path {
-    margin: 5px;
+    margin: 3px 6px 3px 0;
     display: inline-block;
-    padding: 1px 10px;
+    padding: 2px 10px;
     min-width: 300px;
     max-width: 600px;
     height: 25px;
@@ -575,15 +597,14 @@
     align-content: center;
     font-size: 15px;
     border-radius: 5px;
-    color: #000000;
-    background: #a7a7a7c5;
-    box-shadow:
-      inset 4px 5px 10px #0000008e,
-      inset -4px -4px 15px #ffffff28;
+    color: #dbe4e5;
+    background: #1d2022;
+    border: 1px solid #3d4547;
+    box-shadow: inset 0 1px 0 #ffffff12;
 
     overflow-x: auto;
     white-space: nowrap;
-    cursor: text; /* ← テキストっぽい見た目に */
+    cursor: default;
 
     /* スクロールバー非表示 */
     scrollbar-width: none; /* Firefox */
@@ -668,12 +689,62 @@
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding: 8px 6px 6px 6px;
-    background-color: #0e0e0e52;
-    box-shadow:
-      inset 5px 10px 15px rgba(5, 5, 5, 0.712),
-      inset -5px -5px 8px #dbdbdb21;
+    padding: 8px 8px 7px;
+    background-color: #1a1b1d;
+    border: 1px solid #2f3437;
+    box-shadow: 0 8px 18px #00000055;
     border-radius: 8px;
+  }
+
+  .quick-start {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    min-height: 40px;
+    padding: 6px 12px;
+    border: 1px solid #334245;
+    border-radius: 6px;
+    background: #202426;
+    color: #cbd5d7;
+  }
+  .quick-start-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #2cc5c5;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .quick-start-title .material-symbols-outlined {
+    font-size: 18px;
+  }
+  .quick-start ol {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 16px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 13px;
+  }
+  .quick-start li {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+  .quick-start li span {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #2e3d40;
+    color: #bfeeee;
+    font-size: 12px;
   }
 
   /* トースト通知 */

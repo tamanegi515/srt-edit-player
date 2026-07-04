@@ -186,42 +186,34 @@ select:focus {
 
 /* スクロールバーの縦方向の色を変更 */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   background-color: #38383800;
   /* スクロールバーの背景色 */
 }
 
 /* スクロールバーの縦方向のトラック（スクロールバーの背後に表示される領域）の色を変更 */
 ::-webkit-scrollbar-track {
-  background-color: #303c3f;
+  background-color: #202527;
   border: 1px solid #252525;
 }
 
 /* スクロールバーの縦方向のスクロールバーの色を変更 */
 ::-webkit-scrollbar-thumb {
-  background-color: #21a7a7c5;
+  background-color: #4b8f92;
   /* スクロールバーの色 */
   border-radius: 4px;
-  background-image: linear-gradient(to top left,
-      rgba(0, 0, 0, 0.2),
-      rgba(0, 0, 0, 0.2) 30%,
-      rgba(0, 0, 0, 0));
-  border-right: 1px solid #252525;
-  border-left: 2px solid #252525;
+  border: 2px solid #202527;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #31b7b7;
 }
 /* 横方向のスクロールバーつまみ（サム） */
 ::-webkit-scrollbar-thumb:horizontal {
-  background-color: #21a7a7c5;
+  background-color: #4b8f92;
   border-radius: 3px;
-  background-image: linear-gradient(
-    to left top,
-    rgba(0, 0, 0, 0.2),
-    rgba(0, 0, 0, 0.2) 30%,
-    rgba(0, 0, 0, 0)
-  );
-  border-top: 1px solid #252525;
-  border-bottom: 2px solid #252525;
+  border: 2px solid #202527;
 }
 
 ::-webkit-resizer {

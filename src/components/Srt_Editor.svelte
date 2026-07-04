@@ -18,6 +18,7 @@
     let editableSrtFiles = $derived(mediaState.media.srt_data.filter((track) => !track.isImageTrack));
     let selectedTrack = $derived(editableSrtFiles.find((track) => track.id === column.trackId) ?? editableSrtFiles[0]);
     let srt_data = $derived(selectedTrack?.data ?? []);
+    let hasClips = $derived((selectedTrack?.data?.length ?? 0) > 0);
     let editorRefs = $state([]);
     let editorScrollBox = $state();
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
@@ -93,13 +94,16 @@
 </script>
 
 <div class="srt-editor">
-    <div>
+    {#if editableSrtFiles.length}
+    <div class="track-select-row">
         <select class="srt_select" value={column.trackId} onchange={(e) => setEditorColumnTrack(column.id, Number(e.currentTarget.value))}>
             {#each editableSrtFiles as srt}
                 <option value={srt.id}>{srt.name}</option>
             {/each}
         </select>
     </div>
+    {/if}
+    {#if selectedTrack && hasClips}
     <div
         class="box"
         bind:this={editorScrollBox}
@@ -108,31 +112,41 @@
             if (!isProgrammaticScroll) uiState.autoScroll = false;
         }}
     >
-        {#if selectedTrack}
-            {#each selectedTrack.data ?? [] as srtdata, index}
-                <div>
-                    <button class="dark nmorph_button jump_button" onclick={() => JumpAudio(index)}>
-                        <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
-                    </button>
+        {#each selectedTrack.data ?? [] as srtdata, index}
+            <div class="clip-row">
+                <button class="dark nmorph_button jump_button" onclick={() => JumpAudio(index)} title="この字幕へ移動" aria-label="この字幕へ移動">
+                    <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
+                </button>
 
-                    {#if iscurrent(index)}
-                        <button onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
-                        <small> - </small>
-                        <button onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
-                    {:else}
-                        <small>{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
-                    {/if}
-                    <CustomTextarea
-                        track_id={selectedTrack.id}
-                        data_id={index}
-                        selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index}
-                        onfocus={() => onTextareaFocus(index)}
-                        bind:this={editorRefs[index]}
-                    />
-                </div>
-            {/each}
-        {/if}
+                {#if iscurrent(index)}
+                    <button class="time-button" onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
+                    <small> - </small>
+                    <button class="time-button" onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
+                {:else}
+                    <small class="time-label">{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
+                {/if}
+                <CustomTextarea
+                    track_id={selectedTrack.id}
+                    data_id={index}
+                    selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index}
+                    onfocus={() => onTextareaFocus(index)}
+                    bind:this={editorRefs[index]}
+                />
+            </div>
+        {/each}
     </div>
+    {:else}
+        <div class="empty-editor-state">
+            <span class="material-symbols-outlined empty-icon">subtitles</span>
+            {#if projectState.dirHandle}
+                <strong>字幕クリップがありません</strong>
+                <p>右上の字幕名にファイル名を入力して、追加ボタンで最初の字幕を作成します。</p>
+            {:else}
+                <strong>フォルダを開くと字幕を編集できます</strong>
+                <p>左上のフォルダボタンから、音声・画像・字幕ファイルの入った作業フォルダを選択します。</p>
+            {/if}
+        </div>
+    {/if}
 </div>
 
 <style>
@@ -143,20 +157,80 @@
         flex-direction: column;
         margin-top: 3px;
     }
+    .track-select-row {
+        flex: 0 0 auto;
+    }
     .box {
         flex: 1 1 auto;
         min-height: 0;
         box-sizing: border-box;
-        border: 1px solid #363636;
-        background-color: #3a3a3a3a;
-        padding: 10px 5px;
+        border: 1px solid #3d4143;
+        background-color: #202123;
+        padding: 10px 7px;
         overflow-y: auto;
+        overflow-x: hidden;
         width: 100%;
-        scrollbar-gutter: auto;
+        scrollbar-gutter: stable;
+        border-radius: 5px;
+    }
+    .clip-row {
+        margin-bottom: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid #303438;
+    }
+    .clip-row:last-child {
+        border-bottom: 0;
+        margin-bottom: 0;
+    }
+    .time-button {
+        height: 24px;
+        color: #d6dddd;
+        background: #2d3032;
+        border: 1px solid #454a4d;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .time-label {
+        color: #9fa8aa;
+        letter-spacing: 0;
+    }
+    .empty-editor-state {
+        flex: 1 1 auto;
+        min-height: 0;
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px dashed #42484b;
+        border-radius: 6px;
+        background: linear-gradient(180deg, #202123 0%, #1b1c1e 100%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 28px 24px;
+        text-align: center;
+        color: #b9c2c4;
+    }
+    .empty-editor-state strong {
+        color: #e0e7e8;
+        font-size: 15px;
+        font-weight: 600;
+    }
+    .empty-editor-state p {
+        max-width: 320px;
+        margin: 0;
+        color: #97a2a5;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    .empty-icon {
+        color: #2cbfc0;
+        font-size: 32px;
+        opacity: 0.9;
     }
     .jump_button {
         height: 24px;
-        margin: 0 10px 6px 7px;
+        margin: 0 10px 6px 2px;
     }
     .srt_select {
         height: 28px;

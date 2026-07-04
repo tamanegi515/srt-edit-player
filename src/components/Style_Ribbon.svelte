@@ -67,7 +67,7 @@
             <tr>
                 <!-- - position - -->
                 <td>
-                    <div class="ribbon-area" style="min-width:200px">
+                    <div class="ribbon-area ribbon-area-primary" style="min-width:200px">
                         <div class="area-title">- position -</div>
 
                         <label>
@@ -145,7 +145,7 @@
                 </td>
                 <!-- - font - -->
                 <td>
-                    <div class="ribbon-area" style="min-width:220px">
+                    <div class="ribbon-area ribbon-area-primary" style="min-width:220px">
                         <div class="area-title">- font -</div>
                         <select bind:value={styles[currentStyleKey].font} onwheel={(e) => handleWheel("font", e)}>
                             <optgroup label="Web">
@@ -344,42 +344,54 @@
         line-height: 1.35;
     }
     .ribbon-area {
-        padding: 2px 8px 6px 15px;
-        margin: 5px;
+        padding: 6px 10px 8px 12px;
+        margin: 3px;
         height: 126px;
         box-sizing: border-box;
         overflow: hidden;
-        border-radius: 10px;
-        background: linear-gradient(140deg, #2020223f, #4646491c);
-        box-shadow:
-            6px 6px 12px #0f0f0f75,
-            -5px -5px 10px #4343467e;
+        border: 1px solid #363c3f;
+        border-radius: 8px;
+        background: linear-gradient(180deg, #27292b 0%, #222426 100%);
+        box-shadow: 0 6px 14px #0000004d;
+    }
+    .ribbon-area-primary {
+        border-color: #245b5f;
+        background: linear-gradient(180deg, #263032 0%, #222628 100%);
     }
     .area-title {
-        margin: 2px 2px;
+        margin: 0 0 8px;
+        padding-bottom: 4px;
         text-align: center;
-        font-size: 15px;
-        color: #1f9797;
+        font-size: 13px;
+        color: #28b7b7;
+        border-bottom: 1px solid #394143;
     }
     .ribbonview {
         height: 148px;
         max-height: 148px;
-        margin-bottom: 5px;
-        padding-bottom: 10px;
+        margin-bottom: 6px;
+        padding: 3px 0 8px;
         box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
         white-space: nowrap;
-        scrollbar-gutter: stable;
+        scrollbar-gutter: auto;
     }
     .ribbonview table {
         width: max-content;
         min-width: max-content;
         table-layout: auto;
+        border-spacing: 0;
+    }
+    .ribbonview tbody,
+    .ribbonview tr {
+        display: flex;
+        align-items: stretch;
     }
     .ribbonview td {
         vertical-align: top;
         white-space: nowrap;
+        padding: 0;
     }
 
     label {
