@@ -28,7 +28,6 @@
 
     async function togglePicker() {
         isOpen = !isOpen;
-        console.log(buttonEl);
         if (buttonEl) {
             const rect = buttonEl.getBoundingClientRect();
             popupPosition = {
@@ -36,8 +35,11 @@
                 left: rect.left + window.scrollX,
             };
         }
-        tmp_hex = hex;
-        rgb = COLOR.hexToRgb(hex);
+        const norm = COLOR.toHex8(hex ?? "#000000ff");
+        tmp_hex = norm;
+        const parsed = COLOR.hexToRgba(norm);
+        rgb = { r: parsed.r, g: parsed.g, b: parsed.b };
+        alpha = parsed.a;
         hsv = COLOR.rgbToHsv(rgb);
         hsl = COLOR.rgbToHsl(rgb);
         await tick();
@@ -57,9 +59,11 @@
 
         try {
             const result = await eyeDropper.open();
-            // 結果の例: { sRGBHex: "#aabbcc" }
-            hex = result.sRGBHex;
-            rgb = COLOR.hexToRgb(hex);
+            // 結果の例: { sRGBHex: "#aabbcc" }（アルファ無し → 不透明として扱う）
+            hex = COLOR.toHex8(result.sRGBHex);
+            const parsed = COLOR.hexToRgba(hex);
+            rgb = { r: parsed.r, g: parsed.g, b: parsed.b };
+            alpha = parsed.a;
             hsv = COLOR.rgbToHsv(rgb);
             hsl = COLOR.rgbToHsl(rgb);
             setBarColor();

@@ -105,6 +105,25 @@ test("normalizes jsonFiles to scriptFiles when reading vc_json", () => {
   expect(data.jsonFiles).toBeUndefined();
 });
 
+test("normalizes all style colors to #rrggbbaa hex on load", () => {
+  const data = getVCJsonData(JSON.stringify({
+    name: "colors.vc_json",
+    styles: {
+      main: {
+        textColor: "rgba(255, 0, 0, 0.5)",
+        outline1: { enable: true, size: 5, color: "rgb(0, 128, 0)" },
+        outline2: { enable: false, size: 0, color: "#abc" },
+        shadow: { enable: true, color: "#11223344" },
+      },
+    },
+  }), "colors.vc_json");
+
+  expect(data.styles.main.textColor).toBe("#ff000080");
+  expect(data.styles.main.outline1.color).toBe("#008000ff");
+  expect(data.styles.main.outline2.color).toBe("#aabbccff");
+  expect(data.styles.main.shadow.color).toBe("#11223344");
+});
+
 test("saves json subtitle tracks as json sentences instead of SRT", async () => {
   const writes = {};
   const dirHandle = {
@@ -788,4 +807,196 @@ test("generates vc_json from the いえカノ folder and prefers json subtitles 
   expect(generated.scriptFiles[0].name).toBe(jsonName);
   expect(generated.srtFiles).toBeUndefined();
   expect(generated.jsonFiles).toBeUndefined();
+});
+
+// seekTime=5 を保存した vc_json（音声なし、字幕は10秒まで）。開いたとき 5 が復元されるべき。
+const vcJson = JSON.stringify({
+  name: "seek.vc_json",
+  seekTime: 5,
+  audioFilePath: "",
+  imageFilePath: "",
+  styles: {
+    "default-style-1": {
+      font: "りいポップ角", fontSize: 40, textColor: "#ffffffff",
+      fontStyle: "normal", fontWeight: "normal", letterSpace: 0, lineSpace: 10,
+      outline1: { enable: true, size: 5, color: "#000000ff" },
+      outline2: { enable: false, size: 0, color: "#000000ff", offsetX: 0, offsetY: 0 },
+      shadow: { enable: true, color: "#000000ff", offsetX: 0, offsetY: 0, blur: 6, size: 2, steps: 8 },
+    },
+  },
+  scriptFiles: [{
+    filePath: "seek.json", name: "seek.json", defaultStyle: "default-style-1",
+    x: 100, y: 100, maxWidth: 800, maxHeight: 300, boxAlignX: 50, boxAlignY: 50,
+    textRotate: "horizontal-tb", textAlign: "center",
+    inlineData: [
+      { startTimeStr: "00:00:00,000", endTimeStr: "00:00:05,000", startTime: 0, endTime: 5, text: "前半", sentences: ["前半"] },
+      { startTimeStr: "00:00:05,000", endTimeStr: "00:00:10,000", startTime: 5, endTime: 10, text: "後半", sentences: ["後半"] },
+    ],
+  }],
+});
+
+test("verify: saved seekTime is restored on open", async ({ page }) => {
+  await page.addInitScript((t) => {
+    const entry = { kind: "file", name: "seek.vc_json", async getFile() { return new File([t], "seek.vc_json", { type: "application/json" }); } };
+    window.showDirectoryPicker = async () => ({
+      name: "seek-folder",
+      async requestPermission() { return "granted"; },
+      async *values() { yield entry; },
+      async getFileHandle(name, opt = {}) {
+        if (opt.create) return { async createWritable() { return { async write() {}, async close() {} }; } };
+        if (name === "seek.vc_json") return entry;
+        throw new DOMException("x", "NotFoundError");
+      },
+    });
+  }, vcJson);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".folder-path").first()).toContainText("seek-folder");
+
+  // duration が確定した後の seek バー値（復元されていれば "5"）
+  await expect.poll(async () => page.locator(".bar-container input[type='range']").inputValue()).toBe("5");
+});
+
+// 以下、レイアウトA+B改修（table→flexレイアウト刷新）で確認されたレイアウト崩れの回帰テスト。
+const layoutCheckClips = JSON.stringify(
+  Array.from({ length: 8 }, (_, i) => ({
+    speaker: "",
+    start: `00:00:${String(i * 3).padStart(2, "0")},000`,
+    end: `00:00:${String(i * 3 + 3).padStart(2, "0")},000`,
+    sentences: [`クリップ${i}のテキストです。レイアウト確認用のダミー文章です。`],
+  })),
+);
+
+test("editor columns overflow scrolls internally instead of clipping toolbar buttons off-screen", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript((jsonText) => {
+    const jsonEntry = { kind: "file", name: "layout-check.json", async getFile() { return new File([jsonText], "layout-check.json", { type: "application/json" }); } };
+    window.showDirectoryPicker = async () => ({
+      name: "layout-check-folder",
+      async requestPermission() { return "granted"; },
+      async *values() { yield jsonEntry; },
+      async getFileHandle(name, options = {}) {
+        if (options.create) return { async createWritable() { return { async write() {}, async close() {} }; } };
+        if (name === "layout-check.json") return jsonEntry;
+        throw new DOMException(`Missing file: ${name}`, "NotFoundError");
+      },
+    });
+  }, layoutCheckClips);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".editor").first()).toBeVisible();
+
+  // 列を4つ追加（default 500px + 150px x4 = 1100px）してビューポートより広くする
+  for (let i = 0; i < 4; i++) {
+    await page.getByTitle("列を増やす").click();
+  }
+
+  await expect.poll(() => page.evaluate(() => {
+    const player = document.querySelector(".player-pane");
+    const editorColumns = document.querySelector(".editor-columns");
+    const saveBtn = document.querySelector('[title="字幕を保存"]');
+    const createBtn = document.querySelector('[data-testid="create-subtitle-track"]');
+    const root = document.scrollingElement || document.documentElement;
+    return {
+      playerWidthAtOrAboveFloor: player.getBoundingClientRect().width >= 219,
+      editorColumnsScrollable: editorColumns.scrollWidth > editorColumns.clientWidth,
+      saveBtnInsideViewport: saveBtn.getBoundingClientRect().right <= window.innerWidth,
+      createBtnInsideViewport: createBtn.getBoundingClientRect().right <= window.innerWidth,
+      rootOverflowX: root.scrollWidth - root.clientWidth,
+    };
+  })).toEqual({
+    playerWidthAtOrAboveFloor: true,
+    editorColumnsScrollable: true,
+    saveBtnInsideViewport: true,
+    createBtnInsideViewport: true,
+    rootOverflowX: 0,
+  });
+});
+
+test("short viewport keeps the workspace and timeline from collapsing below their min-height floors", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 620 });
+  await page.addInitScript((jsonText) => {
+    const jsonEntry = { kind: "file", name: "layout-check.json", async getFile() { return new File([jsonText], "layout-check.json", { type: "application/json" }); } };
+    window.showDirectoryPicker = async () => ({
+      name: "layout-check-folder",
+      async requestPermission() { return "granted"; },
+      async *values() { yield jsonEntry; },
+      async getFileHandle(name, options = {}) {
+        if (options.create) return { async createWritable() { return { async write() {}, async close() {} }; } };
+        if (name === "layout-check.json") return jsonEntry;
+        throw new DOMException(`Missing file: ${name}`, "NotFoundError");
+      },
+    });
+  }, layoutCheckClips);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".editor").first()).toBeVisible();
+
+  await expect.poll(() => page.evaluate(() => {
+    const workspace = document.querySelector(".workspace-table");
+    const trackView = document.querySelector(".track-view");
+    return {
+      // ワークスペース（プレイヤー+エディタ行）は120px未満に潰れない
+      workspaceAtOrAboveFloor: workspace.getBoundingClientRect().height >= 119,
+      // タイムラインは自然な行の高さのまま（flex-shrink:0）でクリップされていない
+      // （.track-view の border 2px×2辺=4px は scrollHeight に含まれないため、その分だけ許容する）
+      trackViewNotCollapsed: Math.abs(trackView.getBoundingClientRect().height - trackView.scrollHeight) <= 4,
+    };
+  })).toEqual({
+    workspaceAtOrAboveFloor: true,
+    trackViewNotCollapsed: true,
+  });
+});
+
+test("timeline playhead stays clipped inside its panel when scrolled past", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.addInitScript((jsonText) => {
+    const jsonEntry = { kind: "file", name: "layout-check.json", async getFile() { return new File([jsonText], "layout-check.json", { type: "application/json" }); } };
+    window.showDirectoryPicker = async () => ({
+      name: "layout-check-folder",
+      async requestPermission() { return "granted"; },
+      async *values() { yield jsonEntry; },
+      async getFileHandle(name, options = {}) {
+        if (options.create) return { async createWritable() { return { async write() {}, async close() {} }; } };
+        if (name === "layout-check.json") return jsonEntry;
+        throw new DOMException(`Missing file: ${name}`, "NotFoundError");
+      },
+    });
+  }, layoutCheckClips);
+
+  await page.goto("/");
+  await page.locator("button").first().click();
+  await expect(page.locator(".editor").first()).toBeVisible();
+
+  // タイムライン自動追従をOFFにし、拡大率を上げてスクロール可能な幅を作る
+  await page.evaluate(() => {
+    document.querySelector(".track-controls input[type=checkbox]").click();
+  });
+  await page.locator(".track-controls input[type=range]").evaluate((el) => {
+    el.value = "20";
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+
+  // 再生ヘッド位置(seekTime=0付近)より、はるかに右へパネルをスクロールする
+  await page.locator(".right-subpanel").evaluate((el) => {
+    el.scrollLeft = el.scrollWidth;
+    el.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+
+  await expect.poll(() => page.evaluate(() => {
+    const rightPanel = document.querySelector(".right-panel");
+    const playhead = document.querySelector(".playhead");
+    return {
+      // 親(.right-panel)が overflow:hidden を持つため、実際の描画は右パネル内にクリップされる
+      panelOverflow: getComputedStyle(rightPanel).overflow,
+      // 再生ヘッドの生の位置は左パネル側に出る条件を満たしている（クリップ確認の前提）
+      headWouldEscapeWithoutClip: playhead.getBoundingClientRect().left < rightPanel.getBoundingClientRect().left,
+    };
+  })).toEqual({
+    panelOverflow: "hidden",
+    headWouldEscapeWithoutClip: true,
+  });
 });

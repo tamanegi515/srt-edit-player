@@ -15,9 +15,12 @@
     });
     let leftWidth = $state(300);
     let isResizing = $state(false);
+    let resizeStartX = 0;
+    let resizeStartWidth = 300;
     function startResizing(event) {
-        console.log("start_resize");
         isResizing = true;
+        resizeStartX = event.clientX;
+        resizeStartWidth = leftWidth;
         document.body.style.cursor = "ew-resize";
     }
     function stopResizing() {
@@ -25,9 +28,10 @@
         document.body.style.cursor = "default";
     }
     function handleResize(event) {
-        if (isResizing) {
-            leftWidth = event.clientX;
-        }
+        if (!isResizing) return;
+        // 絶対 clientX ではなくドラッグ開始からの差分で算出し、min/max でクランプ
+        const next = resizeStartWidth + (event.clientX - resizeStartX);
+        leftWidth = Math.max(120, Math.min(next, 800));
     }
     onMount(() => {
         window.addEventListener("mousemove", handleResize);
@@ -48,22 +52,32 @@
     let duration = $state(3600000);
     let pixel_per_msec = $derived((uiState.timeLineRatio * uiState.timeLineRatio) / 1000);
     let offsetX = $state(0);
+    // 再生ヘッドは canvas に描かず DOM 要素で動かす（目盛り全再描画を毎フレーム起こさないため）。
+    // 位置は canvas の目盛りと同じ画面座標系（offsetX 補正込み）。
+    let playheadX = $derived(
+        (projectState.jsonDataList[projectState.mediaIndex]?.seekTime ?? 0) * 1000 * pixel_per_msec - offsetX,
+    );
     let canvas;
     function panelScroll(e) {
         offsetX = e.target.scrollLeft;
         // console.log(offsetX);
     }
+    // 手動「Scroll」ボタン用: 再生位置を強制的に中央へ
     function scrollTimeLine() {
-        const currentTime = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000;
-        const currentX = currentTime * pixel_per_msec;
-        const containerWidth = timeLineRef.clientWidth;
-        if (timeLineRef) {
-            timeLineRef.scrollLeft = currentX - containerWidth / 2;
-        }
+        if (!timeLineRef) return;
+        const currentX = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000 * pixel_per_msec;
+        timeLineRef.scrollLeft = currentX - timeLineRef.clientWidth / 2;
     }
+    // 自動追従: 毎フレーム中央へ寄せると手動スクロールと競合しガタつくため、
+    // 再生ヘッドが表示範囲の中央帯（デッドゾーン）から外れた時だけ中央へ寄せる。
     $effect(() => {
-        if (uiState.timeLineAuto) {
-            scrollTimeLine();
+        if (!uiState.timeLineAuto || !timeLineRef) return;
+        const currentX = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000 * pixel_per_msec;
+        const view = timeLineRef.clientWidth;
+        const left = timeLineRef.scrollLeft;
+        const margin = view * 0.15; // 端 15% に入ったら追従（中央 70% はデッドゾーン）
+        if (currentX < left + margin || currentX > left + view - margin) {
+            timeLineRef.scrollLeft = currentX - view / 2;
         }
     });
     $effect(() => {
@@ -73,7 +87,6 @@
         const width = (canvas.width = parentWidth);
         const height = (canvas.height = 30);
         const scale_trigger = 80 / pixel_per_msec;
-        console.log(scale_trigger);
         let scales = { max: 10000, major: 1000, secondary: 500, minor: 100 };
         if (scale_trigger > 60000) {
             scales = { max: 3600000, major: 600000, secondary: 60000, minor: 30000 };
@@ -84,17 +97,7 @@
         }
         ctx.clearRect(0, 0, width, height);
 
-        const currentyStart = height;
-        const currentyEnd = 0;
-        const currentTime = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000;
-        const currentX = currentTime * pixel_per_msec + 0.5 - offsetX;
-        ctx.strokeStyle = "#FF0000";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(currentX, currentyStart);
-        ctx.lineTo(currentX, currentyEnd);
-        ctx.stroke();
-
+        // 再生ヘッド（赤線）は DOM 要素（.playhead）で描画。ここでは目盛りのみ。
         ctx.strokeStyle = "#000";
         ctx.lineWidth = 1;
         const start_miliSec = Math.round(offsetX / pixel_per_msec);
@@ -197,25 +200,19 @@
                     </div>
                 {/each}
             </div>
+            <div class="playhead" style="transform: translateX({playheadX}px);"></div>
         </div>
     </div>
 </div>
 
 <style>
-:root {
-    --bg: #2c2c2c;
-    --panel-bg: #1b1b1b;
-    --border-color: #313131;
-    --shadow-light: rgba(255, 255, 255, 0.932);
-    --shadow-dark: rgb(0, 0, 0);
-    --accent: #5e8bff;
-    --text-color: #ddd;
-}
+/* テーマトークンは app.css の :root に集約 */
 
 .track-shell {
     display: flex;
     flex-direction: column;
     min-height: 0;
+    flex-shrink: 0; /* ワークスペースが縮む時にタイムラインの行が無言で潰れないようにする */
 }
 
 .track-controls {
@@ -277,6 +274,7 @@
     background: var(--panel-bg);
     position: relative;
     min-width: 0;
+    overflow: hidden; /* 再生ヘッド（.playhead）がスクロール時に左隣のパネルへはみ出さないようにする */
 }
 
 /* スクロール部分: フラットで余白 */
@@ -299,6 +297,19 @@
 .tickmark {
     background: var(--panel-bg);
     position: absolute;
+}
+
+/* 再生ヘッド: canvas の目盛りと同じ原点（.right-panel 基準）に重ねる赤い縦線 */
+.playhead {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2px;
+    height: 30px;
+    background: #ff0000;
+    pointer-events: none;
+    z-index: 3;
+    will-change: transform;
 }
 
 

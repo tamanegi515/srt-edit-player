@@ -132,15 +132,47 @@ export const COLOR = {
         };
     }, 
     rgbaToHex({ r, g, b }, a) {
-        const toHex = (v) => v.toString(16).padStart(2, '0');
+        const toHex = (v) => {
+            const n = Math.max(0, Math.min(255, Math.round(Number(v) || 0)));
+            return n.toString(16).padStart(2, '0');
+        };
+        const alpha = Math.max(0, Math.min(1, Number.isFinite(a) ? a : 1));
         return (
             '#' +
             toHex(r) +
             toHex(g) +
             toHex(b) +
-            toHex(Math.round(a * 255))
+            toHex(Math.round(alpha * 255))
         );
-    }, 
+    },
+    // 任意の CSS 色文字列（#rgb / #rgba / #rrggbb / #rrggbbaa / カンマ区切り rgb() / rgba()）を
+    // 正準形 #rrggbbaa へ変換する。カラーピッカーと保存データの色形式を一本化するための入口。
+    // パースできない形式（名前付き色・hsl()・スペース区切り rgb() など）は元の文字列をそのまま返す。
+    // ここで #000000ff へフォールバックすると、保存時に元の色情報を黒で潰して恒久的に破壊してしまうため。
+    toHex8(color) {
+        if (typeof color !== "string" || !color.trim()) return "#000000ff";
+        const c = color.trim().toLowerCase();
+        if (c[0] === "#") {
+            let h = c.slice(1);
+            if (h.length === 3) h = h.split("").map((ch) => ch + ch).join("") + "ff";
+            else if (h.length === 4) h = h.split("").map((ch) => ch + ch).join("");
+            else if (h.length === 6) h += "ff";
+            if (h.length !== 8 || /[^0-9a-f]/.test(h)) return color;
+            return "#" + h;
+        }
+        const m = c.match(/^rgba?\(([^)]+)\)$/);
+        if (m) {
+            const p = m[1].split(",").map((s) => s.trim());
+            const r = parseFloat(p[0]);
+            const g = parseFloat(p[1]);
+            const b = parseFloat(p[2]);
+            if (p.length >= 3 && [r, g, b].every(Number.isFinite)) {
+                const a = p[3] !== undefined ? parseFloat(p[3]) : 1;
+                return this.rgbaToHex({ r, g, b }, Number.isFinite(a) ? a : 1);
+            }
+        }
+        return color;
+    },
     rgbToHsl({ r, g, b }) {
         r /= 255; g /= 255; b /= 255;
         const max = Math.max(r, g, b), min = Math.min(r, g, b);

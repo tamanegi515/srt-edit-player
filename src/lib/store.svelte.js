@@ -140,6 +140,11 @@ export function setProjectDataList(list) {
 }
 
 export function setLoadedMedia(media) {
+    // メディア切り替え/再読込で、前メディアの画像 blob URL を解放（音声 URL は useAudio.set が解放）
+    const oldImage = mediaState.media?.image_data?.currentImage;
+    if (oldImage && typeof oldImage === "string" && oldImage.startsWith("blob:") && oldImage !== media?.image_data?.currentImage) {
+        URL.revokeObjectURL(oldImage);
+    }
     mediaState.media = media;
     resetInteractionState();
 }
@@ -204,18 +209,66 @@ function releaseAudioUrl() {
     }
 }
 
+// 再生状態を音声要素の実イベントから同期する。これにより「曲末で停止しても再生ボタンが
+// pause のまま固まる」「外部要因で一時停止しても UI がずれる」を防ぐ。
+// 再生位置を追従させる rAF ループもここ（イベントの発火元）から起動・停止することで、
+// 起動経路を一本化する（togglePlayback からの手動起動だと、外部要因（ハードウェアの
+// メディアキー等）での再生開始でループが一切起動されずUIが凍結する／連打で二重に
+// 起動される、という2つの不具合があった）。
+let _rafId = /** @type {number|null} */ (null);
+
+function tick() {
+    if (!_audio || _audio.paused) {
+        _rafId = null;
+        return;
+    }
+    const data = activeJsonData;
+    if (data) data.seekTime = _audio.currentTime;
+    if (uiState.autoScroll) {
+        for (const ref of useRefs.editorRefs) {
+            if (ref) ref.scrollToIndex(data?.seekTime ?? 0);
+        }
+    }
+    _rafId = requestAnimationFrame(tick);
+}
+
+function startTickLoop() {
+    if (_rafId != null) return; // 既に稼働中なら二重起動しない
+    _rafId = requestAnimationFrame(tick);
+}
+
+function stopTickLoop() {
+    if (_rafId != null) {
+        cancelAnimationFrame(_rafId);
+        _rafId = null;
+    }
+}
+
+function onAudioPlay() { mediaState.media.isPlaying = true; startTickLoop(); }
+function onAudioStop() { mediaState.media.isPlaying = false; stopTickLoop(); }
+
 export const useAudio = {
     /** @returns {HTMLAudioElement|null} */
     get audio() { return _audio; },
     /** @param {HTMLAudioElement|null} a @param {string|null} url */
     set(a, url = null) {
-        if (_audio && _audio !== a) {
-            _audio.pause();
-            _audio.src = "";
+        if (_audio) {
+            _audio.removeEventListener("ended", onAudioStop);
+            _audio.removeEventListener("pause", onAudioStop);
+            _audio.removeEventListener("play", onAudioPlay);
+            if (_audio !== a) {
+                _audio.pause();
+                _audio.src = "";
+            }
         }
         releaseAudioUrl();
         _audio = a;
         _audioUrl = url;
+        if (_audio) {
+            _audio.addEventListener("ended", onAudioStop);
+            _audio.addEventListener("pause", onAudioStop);
+            _audio.addEventListener("play", onAudioPlay);
+        }
     },
     stop() {
         if (_audio) {
@@ -225,16 +278,18 @@ export const useAudio = {
         releaseAudioUrl();
         _audio = null;
         mediaState.media.isPlaying = false;
+        stopTickLoop();
     },
     pause() {
         _audio?.pause();
         mediaState.media.isPlaying = false;
+        stopTickLoop();
     },
     play() {
         if (!_audio) return;
-        _audio.play().then(() => {
-            mediaState.media.isPlaying = true;
-        }).catch((err) => {
+        // isPlaying=true とループ起動は 'play' イベント（onAudioPlay）側で行う。
+        // ここでは再生開始の失敗のみハンドリングする（失敗時は 'play' イベントが発火しないため）。
+        _audio.play().catch((err) => {
             console.warn("音声再生に失敗:", err);
             mediaState.media.isPlaying = false;
         });

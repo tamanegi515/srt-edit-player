@@ -13,7 +13,7 @@
     import CustomTextarea from "./Custom_Textarea.svelte";
     import { onDestroy, onMount } from "svelte";
 
-    let { parents_height = $bindable(), column, ...props } = $props();
+    let { column, ...props } = $props();
 
     let editableSrtFiles = $derived(mediaState.media.srt_data.filter((track) => !track.isImageTrack));
     let selectedTrack = $derived(editableSrtFiles.find((track) => track.id === column.trackId) ?? editableSrtFiles[0]);
@@ -83,8 +83,6 @@
         }
     }
 
-    let this_height = $derived.by(() => Math.max(120, parents_height - 130));
-
     onMount(() => {
         window.addEventListener("srt-editor-scroll-current", handleExternalScroll);
     });
@@ -105,7 +103,6 @@
     <div
         class="box"
         bind:this={editorScrollBox}
-        style="height: {this_height}px;"
         data-testid="editor-scroll"
         onscroll={() => {
             if (!isProgrammaticScroll) uiState.autoScroll = false;
@@ -147,7 +144,7 @@
         margin-top: 3px;
     }
     .box {
-        flex: 0 0 auto;
+        flex: 1 1 auto;
         min-height: 0;
         box-sizing: border-box;
         border: 1px solid #363636;

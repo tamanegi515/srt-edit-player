@@ -3,7 +3,7 @@
     import ViewContainer from "./View_Container.svelte";
     import { getFileFromPath, wheelAdjust } from "../lib/util";
     import CustomSlider from "./Custom_Slider.svelte";
-    import { mediaState, projectState, uiState, useAudio, useRefs } from "../lib/store.svelte";
+    import { mediaState, projectState, uiState, useAudio } from "../lib/store.svelte";
     import { getCurrentText } from "../lib/data_process";
 
 
@@ -16,62 +16,63 @@
         if (!uiState.imageAuto || !imageTrack) return;
         const entry = getCurrentText(imageTrack.data, json_data.seekTime);
         if (!entry.text || entry.text === mediaState.media.image_data.currentImagePath) return;
-        // async 画像読み込み
+        // async 画像読み込み。await 中にメディアが切り替わった場合に備え、対象の
+        // image_data を先に捕捉しておき、await 後は捕捉した参照が今も current かを
+        // 確認してから書き込む（でないと新メディアの画像を古い画像で上書きしてしまう）。
+        const targetImageData = mediaState.media.image_data;
         (async () => {
             const imageFile = await getFileFromPath(projectState.dirHandle, entry.text.replace(/\\/g, "/"));
             if (!imageFile) return;
+            if (mediaState.media.image_data !== targetImageData) return;
             const imageURL = URL.createObjectURL(imageFile);
-            const oldUrl = mediaState.media.image_data.currentImage;
+            const oldUrl = targetImageData.currentImage;
             if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-            mediaState.media.image_data.currentImage = imageURL;
-            mediaState.media.image_data.currentImagePath = entry.text;
-            mediaState.media.image_data.currentId = entry.index;
+            targetImageData.currentImage = imageURL;
+            targetImageData.currentImagePath = entry.text;
+            targetImageData.currentId = entry.index;
         })().catch((err) => console.warn("画像自動切り替えをスキップ:", entry.text, err));
     });
-
-    function scrollEditor() {
-        for (const ref of useRefs.editorRefs) {
-            if (ref) {
-                ref.scrollToIndex(json_data.seekTime);
-            }
-        }
-    }
 
     function togglePlayback() {
         if (mediaState.media.isPlaying) {
             useAudio.pause();
         } else {
             if (!useAudio.audio) return;
+            // isPlaying の反映と再生位置追従ループの起動は audio の 'play' イベント
+            // （store.svelte.js 側）が行う。外部要因（ハードウェアのメディアキー等）で
+            // 再生が始まった場合も同じ経路でループが起動するようにするため。
             useAudio.play();
-            requestAnimationFrame(tick);
         }
     }
-    async function tick() {
-        if (useAudio.audio && !useAudio.audio.paused) {
-            json_data.seekTime = useAudio.audio.currentTime;
-            if (uiState.autoScroll) {
-                scrollEditor();
-            }
-            requestAnimationFrame(tick);
-        }
+
+    function seekBy(sec) {
+        // ロード直後で duration がまだ未確定（0）の間に復元済み seekTime を破壊しないよう、
+        // シークバーの max と同じ「duration と現在の seekTime の大きい方」を上限にする。
+        const ceiling = Math.max(mediaState.media.duration || 0, json_data.seekTime || 0);
+        json_data.seekTime = Math.max(0, Math.min(ceiling, json_data.seekTime + sec));
+        useAudio.seek();
     }
     async function changeIMG(id) {
         if (!imageTrack) return;
         const data = imageTrack.data;
-        const nextId = mediaState.media.image_data.currentId + id;
+        // await 中にメディアが切り替わった場合に備え、対象の image_data を先に捕捉しておく
+        const targetImageData = mediaState.media.image_data;
+        const nextId = targetImageData.currentId + id;
         if (nextId < 0 || nextId >= data.length) return;
-        mediaState.media.image_data.currentId = nextId;
+        targetImageData.currentId = nextId;
         const imageFile = await getFileFromPath(projectState.dirHandle, data[nextId].text.replace(/\\/g, "/")).catch((err) => {
             console.warn("画像切り替えをスキップ:", data[nextId].text, err);
             return null;
         });
         if (!imageFile) return;
+        // await 後、捕捉した image_data が今も current でなければ（メディア切替済みなら）中断する
+        if (mediaState.media.image_data !== targetImageData) return;
         const imageURL = URL.createObjectURL(imageFile);
         // 旧画像 URL を即座に解放
-        const oldUrl = mediaState.media.image_data.currentImage;
+        const oldUrl = targetImageData.currentImage;
         if (oldUrl && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
-        mediaState.media.image_data.currentImage = imageURL;
-        mediaState.media.image_data.currentImagePath = data[nextId].text;
+        targetImageData.currentImage = imageURL;
+        targetImageData.currentImagePath = data[nextId].text;
     }
     // タイム表示
     function formatTime(seconds) {
@@ -93,10 +94,13 @@
         const step = event.shiftKey ? 5 : 1;
 
         switch (prop) {
-            case "seek":
-                json_data.seekTime = Math.max(0, Math.min(mediaState.media.duration || 0, json_data.seekTime + delta));
+            case "seek": {
+                // seekBy と同じ理由で、上限は duration と現在の seekTime の大きい方にする
+                const ceiling = Math.max(mediaState.media.duration || 0, json_data.seekTime || 0);
+                json_data.seekTime = Math.max(0, Math.min(ceiling, json_data.seekTime + delta));
                 useAudio.seek();
                 break;
+            }
             case "volume":
                 mediaState.media.volume = Math.max(0, Math.min(1, mediaState.media.volume - delta * 0.02));
                 useAudio.setVol();
@@ -109,6 +113,30 @@
                 break;
         }
     }
+
+    onMount(() => {
+        function onKey(e) {
+            // 入力中（contenteditable / input / textarea / select）や、フォーカス中のボタン
+            // 操作（Space/Enterでの押下）は無効化して編集・既存のキー操作を邪魔しない。
+            // BUTTON を除外しないと、フォーカス中のボタン上の Space キーがここで
+            // preventDefault され、ボタン本来の押下（クリック）が発火しなくなる。
+            const t = e.target;
+            const tag = t?.tagName;
+            if (t?.isContentEditable || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || tag === "BUTTON") return;
+            if (e.key === " " || e.code === "Space") {
+                e.preventDefault();
+                togglePlayback();
+            } else if (e.key === "ArrowLeft") {
+                e.preventDefault();
+                seekBy(e.shiftKey ? -5 : -1);
+            } else if (e.key === "ArrowRight") {
+                e.preventDefault();
+                seekBy(e.shiftKey ? 5 : 1);
+            }
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
 </script>
 
 <div class="media-player">
@@ -121,7 +149,7 @@
             <input
                 type="range"
                 min="0"
-                max={mediaState.media.duration}
+                max={Math.max(mediaState.media.duration || 0, json_data.seekTime || 0)}
                 step="0.1"
                 bind:value={json_data.seekTime}
                 oninput={() => useAudio.seek()}
@@ -131,6 +159,9 @@
                 {formatTime(json_data.seekTime)} / {formatTime(mediaState.media.duration)}
             </p>
         </div>
+        {#if !mediaState.media.isAudio}
+            <div class="no-audio-note">音声ファイルがありません（字幕の時間のみ表示）</div>
+        {/if}
 
         <div class="control-row">
             <button class="nmorph_button" onclick={togglePlayback}>
@@ -285,6 +316,13 @@
         align-items: center;
         width: 100%;
         height: 24px;
+    }
+
+    .no-audio-note {
+        color: #8a8a8a;
+        font-size: 12px;
+        text-align: center;
+        margin: 2px 0;
     }
 
     .playBtn {

@@ -47,7 +47,9 @@
 
     let observer;
     function setObserver() {
-        if (useRefs.imageRef) {
+        // 画像切替のたびに呼ばれるため、古い ResizeObserver を必ず破棄してから張り直す（リーク防止）
+        observer?.disconnect();
+        if (useRefs.imageRef?.offsetParent) {
             observer = new ResizeObserver(() => {
                 updateImageRect();
             });
@@ -65,7 +67,7 @@
     {#if mediaState.media.image_data?.currentImage}
         <img src={mediaState.media.image_data.currentImage} alt="表示画像" class="media-image" bind:this={useRefs.imageRef} onload={setObserver} onmousemove={handleMouseMove} />
     {:else}
-        <div class="media-placeholder"></div>
+        <div class="media-placeholder"><span>画像がありません</span></div>
     {/if}
     {#each mediaState.media.srt_data as srt, index}
         {#if !srt.isImageTrack}
@@ -104,6 +106,14 @@
         position: absolute;
         inset: 0;
         background: #050505;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .media-placeholder span {
+        color: #5a5a5a;
+        font-size: 14px;
+        user-select: none;
     }
     .overlay-text {
         position: absolute;

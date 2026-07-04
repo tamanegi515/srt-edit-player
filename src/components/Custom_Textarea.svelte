@@ -20,6 +20,9 @@
     let iscurrent = $derived.by(() => data?.startTime <= json_data.seekTime && json_data.seekTime <= data?.endTime);
     let contextMenu = $state(emptyContextMenu());
     let isComposing = false;
+    // このエディタ自身に未コミットの入力（debounce 待ち）がある間だけ true。
+    // フォーカスの有無ではなく実際の未コミット編集の有無で DOM 保護を判定するためのフラグ。
+    let hasPendingEdit = false;
     let inputTimeout;
 
     export function scrollToIndex() {
@@ -71,6 +74,7 @@
                 redoStack = [...redoStack, current];
                 editorRef.innerHTML = prev;
                 updateTextFromHTML();
+                placeCaretAtEnd();
             }
         }
 
@@ -83,6 +87,7 @@
                 undoStack = [...undoStack, current];
                 editorRef.innerHTML = next;
                 updateTextFromHTML();
+                placeCaretAtEnd();
             }
         }
     }
@@ -170,14 +175,17 @@
 
     function updateTextFromHTML() {
         if (!data) return;
-        isComposing = true;
         setSrtItemText(data, extractTextFromHTML(editorRef.innerHTML));
-        isComposing = false;
     }
 
     $effect(() => {
-        if (!editorRef || isComposing || !data) return;
+        if (!editorRef || !data) return;
         const text = getEditorText(data);
+        // このエディタに未コミットの入力（通常入力の debounce 待ち・IME 変換中）がある間だけ
+        // DOM を正としてキャレットを保持する。フォーカスの有無では判定しない。
+        // （同じクリップを別列でも表示している場合、フォーカスが移った直後は pending が無いため
+        //   即座に同期でき、フォーカス中の列だけ表示が古いまま残ってモデルを上書きする事故を防ぐ）
+        if (isComposing || hasPendingEdit) return;
         if (extractTextFromHTML(editorRef.innerHTML) !== text) {
             editorRef.innerHTML = formatForDisplay(text);
         }
@@ -224,15 +232,62 @@
         sel.removeAllRanges();
         sel.addRange(range);
         clearTimeout(inputTimeout);
-        inputTimeout = setTimeout(updateTextFromHTML, 0);
+        hasPendingEdit = true;
+        inputTimeout = setTimeout(() => {
+            updateTextFromHTML();
+            hasPendingEdit = false;
+        }, 0);
     }
 
     function onInput() {
+        // IME 変換中はモデルへ書き戻さない（確定時にまとめて反映し、変換の分断を防ぐ）
+        if (isComposing) return;
+        hasPendingEdit = true;
         clearTimeout(inputTimeout);
         inputTimeout = setTimeout(() => {
             pushUndo();
             updateTextFromHTML();
+            hasPendingEdit = false;
         }, 100);
+    }
+
+    function onCompositionStart() {
+        isComposing = true;
+    }
+
+    function onCompositionEnd() {
+        isComposing = false;
+        hasPendingEdit = true;
+        // 変換確定後に一度だけモデルへ反映
+        clearTimeout(inputTimeout);
+        inputTimeout = setTimeout(() => {
+            pushUndo();
+            updateTextFromHTML();
+            hasPendingEdit = false;
+        }, 0);
+    }
+
+    function onBlur() {
+        if (isComposing) return;
+        // 保留中の入力を確定し、モデルの正準形で表示を整える（フォーカスが外れた後なので安全）
+        clearTimeout(inputTimeout);
+        hasPendingEdit = false;
+        updateTextFromHTML();
+        if (!data || !editorRef) return;
+        const text = getEditorText(data);
+        if (extractTextFromHTML(editorRef.innerHTML) !== text) {
+            editorRef.innerHTML = formatForDisplay(text);
+        }
+    }
+
+    function placeCaretAtEnd() {
+        if (!editorRef) return;
+        const range = document.createRange();
+        range.selectNodeContents(editorRef);
+        range.collapse(false);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
     }
 
     function execCommandSafe(cmd) {
@@ -347,10 +402,16 @@
     contenteditable
     bind:this={editorRef}
     onfocus={onfocus}
+    onblur={onBlur}
     oncontextmenu={onContextMenu}
     oninput={onInput}
+    oncompositionstart={onCompositionStart}
+    oncompositionend={onCompositionEnd}
     onkeydown={(e) => {
         if (e.key === "Enter") {
+            // IME変換確定のEnterはisComposing=true（一部ブラウザはkeyCode 229）で届く。
+            // ここで改行を挿入すると変換確定のたびに余計な改行が混入するため何もしない。
+            if (e.isComposing || e.keyCode === 229 || isComposing) return;
             e.preventDefault();
             insertLineBreakAtCursor();
         } else {

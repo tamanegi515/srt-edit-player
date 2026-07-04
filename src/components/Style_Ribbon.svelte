@@ -344,9 +344,9 @@
         line-height: 1.35;
     }
     .ribbon-area {
-        padding: 1px 5px 5px 15px;
+        padding: 2px 8px 6px 15px;
         margin: 5px;
-        height: 112px;
+        height: 126px;
         box-sizing: border-box;
         overflow: hidden;
         border-radius: 10px;
@@ -362,10 +362,10 @@
         color: #1f9797;
     }
     .ribbonview {
-        height: 130px;
-        max-height: 130px;
+        height: 148px;
+        max-height: 148px;
         margin-bottom: 5px;
-        padding-bottom: 12px;
+        padding-bottom: 10px;
         box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
@@ -437,10 +437,6 @@
     }
     .CheckButtonArea input[type="checkbox"]:checked + label span:after {
         color: #fff; /* 文字色             */
-    }
-
-    :root {
-        --primary-color: #0f7d91; /* 必要に応じて好きな色に */
     }
 </style>
 
