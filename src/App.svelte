@@ -379,20 +379,6 @@
     </div>
   </header>
 
-  {#if showQuickStart}
-    <section class="quick-start" aria-label="使い方">
-      <div class="quick-start-title">
-        <span class="material-symbols-outlined">info</span>
-        <span>使い方</span>
-      </div>
-      <ol>
-        <li><span>1</span>フォルダを開く</li>
-        <li><span>2</span>メディアを選ぶ</li>
-        <li><span>3</span>字幕を編集して保存</li>
-      </ol>
-    </section>
-  {/if}
-
   {#if uiState.viewRibbon}
     <StyleRibbon></StyleRibbon>
   {/if}
@@ -406,6 +392,20 @@
       <div class="player-pane">
         {#if mediaState.media}
           <MediaPlayer />
+        {/if}
+        {#if showQuickStart}
+          <!-- フォルダ未選択時のみ、プレイヤー上に重ねて表示する（レイアウトフローには入れない） -->
+          <section class="quick-start" aria-label="使い方">
+            <div class="quick-start-title">
+              <span class="material-symbols-outlined">info</span>
+              <span>使い方</span>
+            </div>
+            <ol>
+              <li><span>1</span>フォルダを開く</li>
+              <li><span>2</span>メディアを選ぶ</li>
+              <li><span>3</span>字幕を編集して保存</li>
+            </ol>
+          </section>
         {/if}
       </div>
 
@@ -535,6 +535,7 @@
     min-width: 220px; /* プレイヤーが0幅まで潰れて操作不能にならないための下限 */
     min-height: 0;
     display: flex;
+    position: relative; /* quick-start オーバーレイの基準 */
   }
   .player-pane > :global(.media-player) {
     flex: 1 1 auto;
@@ -697,15 +698,23 @@
   }
 
   .quick-start {
-    flex: 0 0 auto;
+    /* レイアウトフローに入れず、プレイヤー領域の上部中央にフローティング表示する */
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    pointer-events: none; /* 下のプレイヤー操作を邪魔しない */
+    max-width: calc(100% - 24px);
+    box-sizing: border-box;
     display: flex;
     align-items: center;
     gap: 18px;
-    min-height: 40px;
-    padding: 6px 12px;
+    padding: 8px 16px;
     border: 1px solid #334245;
-    border-radius: 6px;
-    background: #202426;
+    border-radius: 8px;
+    background: #202426f0;
+    box-shadow: 0 8px 18px #00000055;
     color: #cbd5d7;
   }
   .quick-start-title {

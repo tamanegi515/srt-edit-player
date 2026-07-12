@@ -228,10 +228,12 @@
         display: flex;
         flex-direction: column;
         gap: 6px;
-        padding: 6px 10px 8px;
-        border-top: 1px solid #383838;
+        margin: 0 5px 5px; /* media-stage の padding: 5px と左右端を揃える */
+        padding: 8px 12px 10px;
+        border: 1px solid #2f3437;
+        border-radius: 10px;
         background: linear-gradient(180deg, #252527 0%, #202022 100%);
-        box-shadow: inset 0 1px 0 #3b3b3d, 0 -4px 10px #00000030;
+        box-shadow: 0 8px 18px #00000040;
     }
     .control-row {
         display: flex;
