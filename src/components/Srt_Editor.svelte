@@ -151,11 +151,13 @@
 
 <style>
     .srt-editor {
-        height: 100%;
+        /* 高さは親（.editor-column-body）の flex stretch に任せる。
+           height:100% + margin だと親を数px超えて余計な縦スクロールバーが出る */
         min-height: 0;
         display: flex;
         flex-direction: column;
-        margin-top: 3px;
+        padding-top: 3px;
+        box-sizing: border-box;
     }
     .track-select-row {
         flex: 0 0 auto;

@@ -346,9 +346,11 @@
     .ribbon-area {
         padding: 6px 10px 8px 12px;
         margin: 3px;
-        height: 126px;
+        /* 高さは内容に合わせる（固定高だと下端の入力が切れる）。
+           tr が flex + stretch なので、兄弟パネルは最も高いパネルへ揃える。
+           上下 margin 3px ぶんを引いて td からはみ出さないようにする */
+        height: calc(100% - 6px);
         box-sizing: border-box;
-        overflow: hidden;
         border: 1px solid #363c3f;
         border-radius: 8px;
         background: linear-gradient(180deg, #27292b 0%, #222426 100%);
@@ -367,8 +369,10 @@
         border-bottom: 1px solid #394143;
     }
     .ribbonview {
-        height: 148px;
-        max-height: 148px;
+        /* main の縦 flex 配分で潰されない（ワークスペースの内容が大きい時に
+           リボンだけが比例縮小されて数pxの帯になる事故を防ぐ）。
+           高さは固定せず内容に合わせる（固定高だとパネル下端が切れる） */
+        flex: 0 0 auto;
         margin-bottom: 6px;
         padding: 3px 0 8px;
         box-sizing: border-box;

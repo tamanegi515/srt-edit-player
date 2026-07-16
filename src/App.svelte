@@ -415,33 +415,38 @@
       <!-- 右: 編集エリア（列の合計幅 totalWidth に左右パディング分を足した値を上限にし、
            プレイヤーとの取り合いで幅が足りない時は縮小＋内部横スクロールで収める） -->
       <div class="srt_area" style="max-width: calc({totalWidth}px + 30px);">
+        <!-- 折り返しはグループ単位（ボタン1個だけが次の行に落ちる崩れを防ぐ） -->
         <div class="editor-toolbar">
-          <button class="nmorph_button" title="列を減らす" aria-label="列を減らす" onclick={removeEditorColumn}>
-            <span class="material-symbols-outlined"> chevron_left </span>
-          </button>
-          <span class="col-count">{editorLayoutState.columns.length}</span>
-          <button class="nmorph_button" title="列を増やす" aria-label="列を増やす" onclick={addEditorColumn}>
-            <span class="material-symbols-outlined"> chevron_right </span>
-          </button>
-          <button class="nmorph_button" onclick={scrollEditor} title="再生位置にスクロール"> Scroll </button>
+          <div class="toolbar-cluster">
+            <button class="nmorph_button" title="列を減らす" aria-label="列を減らす" onclick={removeEditorColumn}>
+              <span class="material-symbols-outlined"> chevron_left </span>
+            </button>
+            <span class="col-count">{editorLayoutState.columns.length}</span>
+            <button class="nmorph_button" title="列を増やす" aria-label="列を増やす" onclick={addEditorColumn}>
+              <span class="material-symbols-outlined"> chevron_right </span>
+            </button>
+            <button class="nmorph_button" onclick={scrollEditor} title="再生位置にスクロール"> Scroll </button>
+          </div>
           <span class="toolbar-spacer"></span>
-          <input class="new-track-name" data-testid="new-subtitle-track-name" type="text" bind:value={newTrackName} placeholder="new subtitle" />
-          <select class="new-track-format" data-testid="new-subtitle-track-format" bind:value={newTrackFormat}>
-            <option value="json">json</option>
-            <option value="srt">srt</option>
-          </select>
-          <button class="nmorph_button" data-testid="create-subtitle-track" onclick={createSubtitleTrackFromUI} title="字幕トラックを作成" aria-label="字幕トラックを作成">
-            <span class="material-symbols-outlined"> playlist_add </span>
-          </button>
-          <button class="nmorph_button" onclick={save_SRT_Files} title="字幕を保存" aria-label="字幕を保存">
-            {#if uiState.srtSaveStatus == 0}
-              <span class="material-symbols-outlined"> save_as </span>
-            {:else if uiState.srtSaveStatus > 0}
-              <span class="material-symbols-outlined"> check </span>
-            {:else}
-              <span class="material-symbols-outlined"> error </span>
-            {/if}
-          </button>
+          <div class="toolbar-cluster track-create">
+            <input class="new-track-name" data-testid="new-subtitle-track-name" type="text" bind:value={newTrackName} placeholder="new subtitle" />
+            <select class="new-track-format" data-testid="new-subtitle-track-format" bind:value={newTrackFormat}>
+              <option value="json">json</option>
+              <option value="srt">srt</option>
+            </select>
+            <button class="nmorph_button" data-testid="create-subtitle-track" onclick={createSubtitleTrackFromUI} title="字幕トラックを作成" aria-label="字幕トラックを作成">
+              <span class="material-symbols-outlined"> playlist_add </span>
+            </button>
+            <button class="nmorph_button" onclick={save_SRT_Files} title="字幕を保存" aria-label="字幕を保存">
+              {#if uiState.srtSaveStatus == 0}
+                <span class="material-symbols-outlined"> save_as </span>
+              {:else if uiState.srtSaveStatus > 0}
+                <span class="material-symbols-outlined"> check </span>
+              {:else}
+                <span class="material-symbols-outlined"> error </span>
+              {/if}
+            </button>
+          </div>
         </div>
 
         <div class="editor-columns">
@@ -555,7 +560,22 @@
     border-bottom: 1px solid #313638;
   }
   .editor-toolbar .toolbar-spacer {
-    flex: 1 1 auto;
+    flex: 1 1 0;
+  }
+  .toolbar-cluster {
+    display: flex;
+    flex-wrap: nowrap; /* クラスタ内では折り返さない（折り返しはクラスタ単位） */
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+  }
+  .editor-toolbar :global(.nmorph_button) {
+    margin: 0; /* 間隔は gap で取る。グローバルの margin: 5px 10px は幅を圧迫して折り返しの原因になる */
+  }
+  .toolbar-cluster.track-create .new-track-name {
+    flex: 1 1 90px; /* 幅が足りない時は入力欄が縮んで1行に収まるようにする */
+    min-width: 60px;
+    max-width: 130px;
   }
   .col-count {
     min-width: 18px;
@@ -569,6 +589,7 @@
     display: flex;
     align-items: stretch;
     overflow-x: auto; /* 列合計幅が収まりきらない時は内部横スクロールで到達可能にする */
+    overflow-y: hidden; /* 縦は各列内の .box がスクロールを担う。ここに縦バーを出すと二重スクロールになる */
   }
   .editor-column {
     position: relative;
@@ -654,10 +675,8 @@
   }
 
   .new-track-name {
-    width: 130px;
     height: 25px;
     box-sizing: border-box;
-    margin-left: 10px;
     color: #d6d6d6;
     background-color: #42424279;
     border: 1px solid #a3a3a349;
