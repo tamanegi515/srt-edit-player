@@ -214,11 +214,6 @@
             <div class="sample" style="background-color: {hex};"></div>
             <div class="sample" style="background-color: {tmp_hex};"></div>
         </div>
-        <button class="nmorph_button eyedropper-button" title="スポイト" aria-label="スポイト" onclick={activateEyedropper}>
-            <span class="material-symbols-outlined">
-                colorize
-                </span>
-          </button>
         <div class="picker-row">
             <!-- 色選択のcanvas -->
             <div class="container">
@@ -259,6 +254,9 @@
 
         <!-- スライダータブ -->
         <div class="tab-switch">
+            <button class="nmorph_button eyedropper-button" title="スポイト" aria-label="スポイト" onclick={activateEyedropper}>
+                <span class="material-symbols-outlined">colorize</span>
+            </button>
             <label><input type="radio" name="TAB" />RGB</label>
             <div class="tab-content">
                 <!-- RGBピッカー -->
@@ -447,8 +445,8 @@
         margin: 0;
         padding: 0;
         vertical-align: middle;
-        bottom: 120px;
-        right: 15px;
+        top: -4px;
+        right: 0;
     }
     .eyedropper-button span{
         font-size: 18px;
@@ -471,6 +469,7 @@
     }
     /* タブ全体を囲むコンテナの設定 */
     .tab-switch {
+        position: relative;
         display: flex; /* タブを横並びに配置 */
         flex-wrap: wrap; /* 幅を超えたら折り返し */
     }

@@ -1,5 +1,24 @@
 import { expect, test } from "@playwright/test";
 
+test("short color popup scrolls without overlapping the eyedropper", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 320 });
+  await page.goto("/srt-edit-player/");
+  await page.evaluate(() => document.fonts.ready);
+  await page.locator(".color_picker_button button").first().click();
+  const popup = page.locator(".popup");
+  await expect(popup).toBeVisible();
+  const bounds = await popup.boundingBox();
+  expect(bounds.y + bounds.height).toBeLessThanOrEqual(320);
+  const dropper = popup.getByRole("button", { name: "スポイト", exact: true });
+  await dropper.scrollIntoViewIfNeeded();
+  const button = await dropper.boundingBox();
+  for (const control of await popup.locator('input[type="range"]:visible, input[type="number"]:visible').all()) {
+    const rect = await control.boundingBox();
+    expect(button.x < rect.x + rect.width && button.x + button.width > rect.x
+      && button.y < rect.y + rect.height && button.y + button.height > rect.y).toBe(false);
+  }
+});
+
 for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
   test(`panel relief and flat controls at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
