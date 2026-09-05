@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 768 }]) {
+for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
   test(`panel relief and flat controls at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const errors = [];
@@ -25,6 +25,11 @@ for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 76
     await expect(picker).toHaveAttribute("aria-expanded", "true");
     const popup = page.locator(".popup");
     await expect(popup).toBeVisible();
+    const popupBounds = await popup.boundingBox();
+    expect(popupBounds.x).toBeGreaterThanOrEqual(0);
+    expect(popupBounds.x + popupBounds.width).toBeLessThanOrEqual(viewport.width);
+    expect(popupBounds.y).toBeGreaterThanOrEqual(0);
+    expect(popupBounds.y + popupBounds.height).toBeLessThanOrEqual(viewport.height);
     const dropper = await popup.getByRole("button", { name: "スポイト", exact: true }).boundingBox();
     for (const input of await popup.locator('input[type="number"]:visible').all()) {
       const bounds = await input.boundingBox();

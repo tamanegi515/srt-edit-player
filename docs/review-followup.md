@@ -33,7 +33,7 @@ Integration review additionally covered shared-file overwrite risks, immutable s
 
 ## Verification Boundaries
 
-On 2026-09-05 the integrated Chromium suite passed 89 tests and the Vite production build passed. Viewports covered 1664x1000, 1426x1209, 1366x768, 1000x700 and 800x700; the ribbon remains below its 155px ceiling.
+On 2026-09-05 the integrated Chromium suite passed 91 tests and the Vite production build passed. Layout viewports covered 1664x1000, 1426x1209, 1366x768, 1000x700 and 800x700; the ribbon remains below its 155px ceiling. Color-picker edge checks additionally cover 768x900 and 390x844.
 
 The material follow-up uses borderless, background-matched relief for the ribbon, editor and playback panels. Small controls use flat shared tokens, including color-picker triggers and bold/italic toggles. Input boundaries and focus indicators remain visible. Color-picker mouse/keyboard opening, color changes and closing have browser regression coverage.
 

@@ -26,15 +26,17 @@
     let hsv_color_v1 = $state("#ffffff");
     let hsv_color_v2 = $state("#ffffff");
 
+    function positionPopup() {
+        if (!buttonEl || !popupEl) return;
+        const rect = buttonEl.getBoundingClientRect();
+        const margin = 8;
+        const left = Math.max(margin, Math.min(rect.left, window.innerWidth - popupEl.offsetWidth - margin));
+        const top = Math.max(margin, Math.min(rect.bottom, window.innerHeight - popupEl.offsetHeight - margin));
+        popupPosition = { left: left + window.scrollX, top: top + window.scrollY };
+    }
+
     async function togglePicker() {
         isOpen = !isOpen;
-        if (buttonEl) {
-            const rect = buttonEl.getBoundingClientRect();
-            popupPosition = {
-                top: rect.bottom + window.scrollY,
-                left: rect.left + window.scrollX,
-            };
-        }
         const norm = COLOR.toHex8(hex ?? "#000000ff");
         tmp_hex = norm;
         const parsed = COLOR.hexToRgba(norm);
@@ -43,6 +45,7 @@
         hsv = COLOR.rgbToHsv(rgb);
         hsl = COLOR.rgbToHsl(rgb);
         await tick();
+        positionPopup();
         drawCanvas();
         setPosition();
         setBarColor();
@@ -182,12 +185,14 @@
         document.body.addEventListener("mousedown", handleClickOutside);
         window.addEventListener("pointermove", handlePointerMove);
         window.addEventListener("pointerup", handlePointerUp);
+        window.addEventListener("resize", positionPopup);
 
         drawCanvas();
 
         return () => {
             window.removeEventListener("pointermove", handlePointerMove);
             window.removeEventListener("pointerup", handlePointerUp);
+            window.removeEventListener("resize", positionPopup);
             document.body.removeEventListener("mousedown", handleClickOutside);
         };
     });
@@ -370,6 +375,8 @@
         z-index: 999;
         min-width: 150px;
         max-width: 280px;
+        max-height: calc(100dvh - 42px);
+        overflow-y: auto;
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
         position: absolute;
     }
