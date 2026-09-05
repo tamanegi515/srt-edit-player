@@ -1,5 +1,4 @@
 ﻿<script>
-    import { onMount } from "svelte";
     import { wheelAdjust } from "../lib/util";
     import CustomColorPicker from "./Custom_ColorPicker.svelte";
     import CustomSlider from "./Custom_Slider.svelte";
@@ -35,18 +34,13 @@
 
     function handleWheel(prop, event) {
         event.preventDefault();
-        const delta = Math.sign(event.deltaY);
-        const step = event.shiftKey ? 10 : 1;
-
-        const styleObj = styles[currentStyleKey];
-
-        if (prop in styleObj) {
-            styleObj[prop] = Math.max(0, (styleObj[prop] || 0) - delta * step);
-        } else if (prop === "position_x") {
-            scriptFiles[currentSrt].boxAlignX = Math.max(0, Math.min(100, scriptFiles[currentSrt].boxAlignX - delta));
-        } else if (prop === "position_y") {
-            scriptFiles[currentSrt].boxAlignY = Math.max(0, Math.min(100, scriptFiles[currentSrt].boxAlignY - delta));
-        }
+        if (prop !== "font" || !event.deltaY || !styles[currentStyleKey]) return;
+        const select = event.currentTarget;
+        const options = Array.from(select.options).filter(option => !option.disabled && !option.parentElement?.disabled);
+        if (!options.length) return;
+        const current = options.findIndex(option => option.value === styles[currentStyleKey].font);
+        const index = current < 0 ? 0 : Math.max(0, Math.min(options.length - 1, current - Math.sign(event.deltaY)));
+        styles[currentStyleKey].font = options[index].value;
     }
 
     function handleChange() {
@@ -98,14 +92,14 @@
                         <label
                             >左右:
                             <!-- <input type="range" bind:value={scriptFiles[currentSrt].boxAlignX} min="0" max="100" step="1" use:wheelAdjust={{ min: 0, step: 1, shiftStep: 10 }} /> -->
-                            <CustomSlider bind:value={scriptFiles[currentSrt].boxAlignX} min="0" max="100" step="1"></CustomSlider>
+                            <CustomSlider variant="compact" bind:value={scriptFiles[currentSrt].boxAlignX} min="0" max="100" step="1"></CustomSlider>
                             {scriptFiles[currentSrt].boxAlignX}%
                         </label>
                         <br />
                         <label
                             >上下:
                             <!-- <input type="range" bind:value={scriptFiles[currentSrt].boxAlignY} min="0" max="100" step="1" use:wheelAdjust={{ min: 0, step: 1, shiftStep: 10 }} /> -->
-                            <CustomSlider bind:value={scriptFiles[currentSrt].boxAlignY} min="0" max="100" step="1"></CustomSlider>
+                            <CustomSlider variant="compact" bind:value={scriptFiles[currentSrt].boxAlignY} min="0" max="100" step="1"></CustomSlider>
                             {scriptFiles[currentSrt].boxAlignY}%
                         </label>
                     </div>
@@ -147,7 +141,7 @@
                 <td>
                     <div class="ribbon-area ribbon-area-primary" style="min-width:220px">
                         <div class="area-title">- font -</div>
-                        <select bind:value={styles[currentStyleKey].font} onwheel={(e) => handleWheel("font", e)}>
+                        <select aria-label="フォント" bind:value={styles[currentStyleKey].font} onwheel={(e) => handleWheel("font", e)}>
                             <optgroup label="Web">
                                 {#each webFonts as font}
                                     <option value={font} style={`font-family: ${font}, Arial, sans-serif;`}>{font}</option>
@@ -215,7 +209,7 @@
                             <div class="area-title">- outline -</div>
                         </div>
                         1：
-                        <label class="toggle_switch" style="margin-right: 5px;">
+                        <label class="toggle_switch">
                             <input type="checkbox" bind:checked={styles[currentStyleKey].outline1.enable} style="visibility: hidden;" onchange={handleChange} />
                             <span class="toggle-slider"></span>
                         </label>
@@ -224,7 +218,7 @@
 
                         <br />
                         2：
-                        <label class="toggle_switch" style="margin-right: 5px;">
+                        <label class="toggle_switch">
                             <input type="checkbox" bind:checked={styles[currentStyleKey].outline2.enable} style="visibility: hidden;" onchange={handleChange} />
                             <span class="toggle-slider"></span>
                         </label>
@@ -257,13 +251,13 @@
                         
                         <label
                         >ぼかし:
-                        <CustomSlider bind:value={styles[currentStyleKey].shadow.blur} min="0" max="100" step="1"></CustomSlider>
+                        <CustomSlider variant="compact" bind:value={styles[currentStyleKey].shadow.blur} min="0" max="100" step="1"></CustomSlider>
                             {styles[currentStyleKey].shadow.blur}px
                         </label>
                         <br />
                         <label>
                         距　離:
-                        <CustomSlider bind:value={styles[currentStyleKey].shadow.size} min="0" max="100" step="1"></CustomSlider>
+                        <CustomSlider variant="compact" bind:value={styles[currentStyleKey].shadow.size} min="0" max="100" step="1"></CustomSlider>
                             {styles[currentStyleKey].shadow.size}px（steps &gt; 1）
                         </label>
 
@@ -277,40 +271,40 @@
 
 <style>
     input[type="number"] {
-        height: 30px;
+        height: var(--control-height-compact);
         width: 50px;
         padding: 3px;
         vertical-align: baseline;
         box-sizing: border-box;
-        margin: 3px 2px 10px 2px;
-        color: #b4b4b4;
-        background-color: #42424279;
-        border: 1px solid #a3a3a349;
+        color: var(--text-color);
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--input-shadow);
         border-radius: 4px;
         min-width: 45px;
         text-align: right;
     }
     input[type="text"] {
-        height: 30px;
+        height: var(--control-height-compact);
         min-width: 90px;
         width: 110px;
         padding: 3px 6px;
         box-sizing: border-box;
-        margin: 3px 2px 10px 2px;
-        color: #d6d6d6;
-        background-color: #42424279;
-        border: 1px solid #a3a3a349;
+        color: var(--text-color);
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--input-shadow);
         border-radius: 4px;
     }
     select {
-        height: 30px;
+        height: var(--control-height-compact);
         padding: 3px;
         vertical-align: baseline;
         box-sizing: border-box;
-        margin: 3px 2px 10px 2px;
-        color: #b4b4b4;
-        background-color: #42424279;
-        border: 1px solid #a3a3a349;
+        color: var(--text-color);
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        box-shadow: var(--input-shadow);
         border-radius: 4px;
     }
     optgroup {
@@ -328,9 +322,8 @@
         gap: 4px;
     }
     .style-create-row .nmorph_button {
-        width: 30px;
-        height: 30px;
-        margin-bottom: 10px;
+        width: var(--control-height-compact);
+        height: var(--control-height-compact);
         padding: 0;
     }
     .style-create-row .material-symbols-outlined {
@@ -351,14 +344,13 @@
            上下 margin 3px ぶんを引いて td からはみ出さないようにする */
         height: calc(100% - 6px);
         box-sizing: border-box;
-        border: 1px solid #363c3f;
+        border: 1px solid transparent;
         border-radius: 8px;
-        background: linear-gradient(180deg, #27292b 0%, #222426 100%);
-        box-shadow: 0 6px 14px #0000004d;
+        background: var(--panel-bg);
+        box-shadow: var(--panel-shadow);
     }
     .ribbon-area-primary {
-        border-color: #245b5f;
-        background: linear-gradient(180deg, #263032 0%, #222628 100%);
+        border-color: transparent;
     }
     .area-title {
         margin: 0 0 8px;
@@ -369,12 +361,13 @@
         border-bottom: 1px solid #394143;
     }
     .ribbonview {
+        --control-size: var(--control-height-compact);
         /* main の縦 flex 配分で潰されない（ワークスペースの内容が大きい時に
            リボンだけが比例縮小されて数pxの帯になる事故を防ぐ）。
            高さは固定せず内容に合わせる（固定高だとパネル下端が切れる） */
         flex: 0 0 auto;
         margin-bottom: 6px;
-        padding: 3px 0 8px;
+        padding: 3px 0 4px;
         box-sizing: border-box;
         overflow-x: auto;
         overflow-y: hidden;
@@ -400,20 +393,25 @@
 
     label {
         position: relative;
-        display: inline-block;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
     }
 
 
     /* === ボタンを表示するエリア ============================== */
     .CheckButtonArea {
-        width: 25px; /* ボタンの横幅       */
-        margin: 3px 0px 3px 10px;
+        width: var(--control-height-compact);
+        position: relative;
         display: inline-block;
     }
 
     /* === チェックボックス ==================================== */
     .CheckButtonArea input[type="checkbox"] {
-        display: none; /* チェックボックス非表示 */
+        position: absolute;
+        opacity: 0;
+        width: 1px;
+        height: 1px;
     }
 
     /* === チェックボックスのラベル（標準） ==================== */
@@ -421,23 +419,22 @@
         display: block; /* ボックス要素に変更 */
         text-align: center; /* 文字位置は中央     */
         align-content: center;
-        border-radius: 5px; /* 角丸               */
-        height: 25px; /* ボタンの高さ       */
+        box-sizing: border-box;
+        border: 1px solid var(--border-color);
+        border-radius: var(--control-radius);
+        height: var(--control-height-compact);
         font-size: 15px; /* 文字サイズ         */
         font-weight: bold; /* 太字               */
         transition: 0.1s; /* ゆっくり変化       */
         font-family: "HGP明朝E", Arial, Helvetica, sans-serif;
 
-        color: #8d8d8d;
-        margin: 5px 0px;
+        color: var(--text-color);
         padding: 0px 0px;
-        background: #29292b;
+        background: var(--control-bg);
         cursor: pointer;
         /* border: 1px solid #29292b; */
         transition: all 0.1s;
-        box-shadow:
-            4px 4px 8px #020202a4,
-            -4px -4px 8px #434346;
+        box-shadow: var(--control-shadow);
     }
 
     /* === ON側のチェックボックスのラベル（ONのとき） ========== */
@@ -445,11 +442,17 @@
         color: rgb(255, 255, 255);
     }
     .CheckButtonArea input[type="checkbox"]:checked + label {
-        color: #1c9199c0;
-        background: #00000067;
-        box-shadow:
-            inset 4px 4px 8px #000000d3,
-            inset -4px -4px 8px #70707067;
+        color: var(--text-color);
+        background: var(--primary-color);
+        border-color: var(--primary-color);
+        box-shadow: var(--control-shadow);
+    }
+    .CheckButtonArea label:hover {
+        border-color: #626269;
+    }
+    .CheckButtonArea input:focus-visible + label {
+        outline: 2px solid var(--focus-color);
+        outline-offset: 2px;
     }
     .CheckButtonArea input[type="checkbox"]:checked + label span:after {
         color: #fff; /* 文字色             */

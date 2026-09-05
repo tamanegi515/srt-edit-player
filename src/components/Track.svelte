@@ -2,6 +2,7 @@
     import { mediaState, uiState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
     import { onMount, onDestroy } from "svelte";
+    import { beginEditorEdit } from "../lib/editor_history";
 
     let { id = $bindable() } = $props();
     //   data = [{startSec:s,endSec:n,text:str}]
@@ -13,9 +14,21 @@
     let dragStartX = $state(0);
     let draggedClipIndex = $state(-1);
     let draggingEdge = $state(null);
+    let dragTrack = null;
+    let commitDrag = null;
+
+    $effect(() => {
+        const track = mediaState.media.srt_data[id];
+        if (dragTrack && dragTrack !== track) stopDrag();
+    });
 
     // ドラッグ開始
     function startEdgeDrag(event, index, edge) {
+        const track = mediaState.media.srt_data[id];
+        if (!track?.data[index + 1]) return;
+        event.preventDefault();
+        dragTrack = track;
+        commitDrag = beginEditorEdit(track, [track.data[index], track.data[index + 1]]);
         isDragging = true;
         dragStartX = event.clientX;
         draggedClipIndex = index;
@@ -27,8 +40,8 @@
     function onDrag(event) {
         if (isDragging) {
             const deltaX = (event.clientX - dragStartX) / zoomRatio;
-            const currentClip = data[draggedClipIndex];
-            const nextClip = data[draggedClipIndex + 1];
+            const currentClip = dragTrack?.data[draggedClipIndex];
+            const nextClip = dragTrack?.data[draggedClipIndex + 1];
             if (!currentClip || !nextClip) return;
 
             // 境界の更新
@@ -47,6 +60,9 @@
 
     // ドラッグ終了
     function stopDrag() {
+        commitDrag?.();
+        commitDrag = null;
+        dragTrack = null;
         isDragging = false;
         document.body.style.cursor = "default";
     }
@@ -56,6 +72,7 @@
         window.addEventListener("mouseup", stopDrag);
     });
     onDestroy(() => {
+        stopDrag();
         window.removeEventListener("mousemove", onDrag);
         window.removeEventListener("mouseup", stopDrag);
     });

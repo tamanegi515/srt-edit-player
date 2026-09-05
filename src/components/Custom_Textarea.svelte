@@ -1,29 +1,24 @@
 <script>
-    import { onMount } from "svelte";
-    import { mediaState, projectState, useStyleList } from "../lib/store.svelte";
+    import { onMount, tick } from "svelte";
+    import { projectState, selectEditorClip, useStyleList } from "../lib/store.svelte";
+    import { beginEditorEdit, editClips, replayEditorEdit } from "../lib/editor_history";
     import { getSrtItemText, setSrtItemText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
 
     const styleList = useStyleList();
 
-    let { track_id, data_id, selected = false, onfocus = () => {}, ...props } = $props();
+    let { track, data, selected = false, onfocus = () => {} } = $props();
 
     const tagList = $derived.by(() => styleList.map((style) => style.name));
     let editorRef = $state();
     let menuRef = $state();
-    let undoStack = $state([]);
-    let redoStack = $state([]);
-    let track = $derived(mediaState.media.srt_data.find((item) => item.id === track_id));
     let data_list = $derived(track?.data ?? []);
-    let data = $derived(data_list[data_id]);
+    let data_id = $derived(data_list.indexOf(data));
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
     let iscurrent = $derived.by(() => data?.startTime <= json_data.seekTime && json_data.seekTime <= data?.endTime);
     let contextMenu = $state(emptyContextMenu());
     let isComposing = false;
-    // このエディタ自身に未コミットの入力（debounce 待ち）がある間だけ true。
-    // フォーカスの有無ではなく実際の未コミット編集の有無で DOM 保護を判定するためのフラグ。
-    let hasPendingEdit = false;
-    let inputTimeout;
+    let pendingEdit = null;
 
     export function scrollToIndex() {
         editorRef?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -59,37 +54,39 @@
     }
 
     function pushUndo() {
-        if (!editorRef) return;
-        undoStack = [...undoStack, editorRef.innerHTML];
-        redoStack = [];
+        if (!pendingEdit && data) pendingEdit = beginEditorEdit(track, [data]);
+    }
+
+    async function replayHistory(redo) {
+        if (pendingEdit) updateTextFromHTML();
+        const box = editorRef?.closest(".box");
+        const clip = replayEditorEdit(track, redo);
+        hideMenu();
+        if (!clip) return;
+        selectEditorClip(track.id, data_list.indexOf(clip));
+        await tick();
+        const target = box?.children[data_list.indexOf(clip)]?.querySelector(".editor");
+        if (target?.isConnected) {
+            target.focus();
+            placeCaretAtEnd(target);
+        }
     }
 
     function onKeyDown(e) {
-        if (e.ctrlKey && e.key === "z") {
-            e.preventDefault();
-            if (undoStack.length > 0) {
-                const current = editorRef.innerHTML;
-                const prev = undoStack[undoStack.length - 1];
-                undoStack = undoStack.slice(0, -1);
-                redoStack = [...redoStack, current];
-                editorRef.innerHTML = prev;
-                updateTextFromHTML();
-                placeCaretAtEnd();
-            }
-        }
+        if (isComposing || e.isComposing || e.keyCode === 229 || !(e.ctrlKey || e.metaKey)) return;
+        const key = e.key.toLowerCase();
+        if (key !== "z" && key !== "y") return;
+        e.preventDefault();
+        replayHistory(key === "y" || e.shiftKey);
+    }
 
-        if (e.ctrlKey && (e.key === "y" || (e.shiftKey && e.key === "z"))) {
+    function onBeforeInput(e) {
+        if (e.inputType === "historyUndo" || e.inputType === "historyRedo") {
             e.preventDefault();
-            if (redoStack.length > 0) {
-                const current = editorRef.innerHTML;
-                const next = redoStack[redoStack.length - 1];
-                redoStack = redoStack.slice(0, -1);
-                undoStack = [...undoStack, current];
-                editorRef.innerHTML = next;
-                updateTextFromHTML();
-                placeCaretAtEnd();
-            }
+            if (!isComposing) replayHistory(e.inputType === "historyRedo");
+            return;
         }
+        pushUndo();
     }
 
     function wrapWithTag(tag) {
@@ -174,25 +171,36 @@
     }
 
     function updateTextFromHTML() {
-        if (!data) return;
-        setSrtItemText(data, extractTextFromHTML(editorRef.innerHTML));
+        if (!data || !editorRef) return;
+        pushUndo();
+        const raw = extractTextFromHTML(editorRef.innerHTML);
+        setSrtItemText(data, raw);
+        // The subtitle normalizer trims sentence edges. Keep live whitespace so Enter
+        // and spaces remain editable, synchronizable and independently undoable.
+        if (data.sentences?.length) {
+            data.sentences[0] = (raw.match(/^\s*/)?.[0] ?? "") + data.sentences[0];
+            const last = data.sentences.length - 1;
+            data.sentences[last] += raw.match(/\s*$/)?.[0] ?? "";
+            data.text = data.sentences.join("\r\n");
+        } else {
+            data.text = raw;
+        }
+        pendingEdit?.();
+        pendingEdit = null;
     }
 
     $effect(() => {
         if (!editorRef || !data) return;
         const text = getEditorText(data);
-        // このエディタに未コミットの入力（通常入力の debounce 待ち・IME 変換中）がある間だけ
-        // DOM を正としてキャレットを保持する。フォーカスの有無では判定しない。
-        // （同じクリップを別列でも表示している場合、フォーカスが移った直後は pending が無いため
-        //   即座に同期でき、フォーカス中の列だけ表示が古いまま残ってモデルを上書きする事故を防ぐ）
-        if (isComposing || hasPendingEdit) return;
+        // Only an active composition owns uncommitted DOM; ordinary input commits synchronously.
+        if (isComposing || pendingEdit) return;
         if (extractTextFromHTML(editorRef.innerHTML) !== text) {
             editorRef.innerHTML = formatForDisplay(text);
         }
     });
 
     function formatForDisplay(raw) {
-        return String(raw ?? "")
+        const html = String(raw ?? "")
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
@@ -201,6 +209,7 @@
                 /&lt;([\w-]+)&gt;([\s\S]*?)&lt;\/&gt;/g,
                 (_, tag, content) => `<span data-tag="${tag}" style="color: #11a8a0;">${content}</span>`,
             );
+        return html.endsWith("<br>") ? `${html}\u200B` : html;
     }
 
     function extractTextFromHTML(html) {
@@ -231,48 +240,28 @@
         range.setEndAfter(spacer);
         sel.removeAllRanges();
         sel.addRange(range);
-        clearTimeout(inputTimeout);
-        hasPendingEdit = true;
-        inputTimeout = setTimeout(() => {
-            updateTextFromHTML();
-            hasPendingEdit = false;
-        }, 0);
+        updateTextFromHTML();
     }
 
     function onInput() {
         // IME 変換中はモデルへ書き戻さない（確定時にまとめて反映し、変換の分断を防ぐ）
         if (isComposing) return;
-        hasPendingEdit = true;
-        clearTimeout(inputTimeout);
-        inputTimeout = setTimeout(() => {
-            pushUndo();
-            updateTextFromHTML();
-            hasPendingEdit = false;
-        }, 100);
+        updateTextFromHTML();
     }
 
     function onCompositionStart() {
+        pushUndo();
         isComposing = true;
     }
 
     function onCompositionEnd() {
         isComposing = false;
-        hasPendingEdit = true;
-        // 変換確定後に一度だけモデルへ反映
-        clearTimeout(inputTimeout);
-        inputTimeout = setTimeout(() => {
-            pushUndo();
-            updateTextFromHTML();
-            hasPendingEdit = false;
-        }, 0);
+        updateTextFromHTML();
     }
 
     function onBlur() {
         if (isComposing) return;
-        // 保留中の入力を確定し、モデルの正準形で表示を整える（フォーカスが外れた後なので安全）
-        clearTimeout(inputTimeout);
-        hasPendingEdit = false;
-        updateTextFromHTML();
+        if (pendingEdit) updateTextFromHTML();
         if (!data || !editorRef) return;
         const text = getEditorText(data);
         if (extractTextFromHTML(editorRef.innerHTML) !== text) {
@@ -280,10 +269,10 @@
         }
     }
 
-    function placeCaretAtEnd() {
-        if (!editorRef) return;
+    function placeCaretAtEnd(target = editorRef) {
+        if (!target) return;
         const range = document.createRange();
-        range.selectNodeContents(editorRef);
+        range.selectNodeContents(target);
         range.collapse(false);
         const sel = window.getSelection();
         sel?.removeAllRanges();
@@ -292,15 +281,21 @@
 
     function execCommandSafe(cmd) {
         editorRef?.focus();
+        if (contextMenu.range) {
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(contextMenu.range);
+        }
+        if (cmd !== "copy") pushUndo();
         document.execCommand(cmd);
-        updateTextFromHTML();
+        if (cmd !== "copy") updateTextFromHTML();
         hideMenu();
     }
 
     function deleteSelection() {
-        const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0) return;
-        sel.getRangeAt(0).deleteContents();
+        if (!contextMenu.range) return;
+        pushUndo();
+        contextMenu.range.deleteContents();
         updateTextFromHTML();
         hideMenu();
     }
@@ -321,7 +316,7 @@
         const sel = window.getSelection();
         if (!sel || sel.rangeCount === 0 || !editorRef) return { beforeTxt: getEditorText(data), afterTxt: "" };
 
-        const range = sel.getRangeAt(0);
+        const range = contextMenu.range ?? sel.getRangeAt(0);
         if (!editorRef.contains(range.commonAncestorContainer)) {
             return { beforeTxt: getEditorText(data), afterTxt: "" };
         }
@@ -329,7 +324,7 @@
         const beforeRange = range.cloneRange();
         beforeRange.setStart(editorRef, 0);
         const afterRange = range.cloneRange();
-        afterRange.setEndAfter(editorRef.lastChild ?? editorRef);
+        afterRange.setEnd(editorRef, editorRef.childNodes.length);
 
         return {
             beforeTxt: extractTextFromHTML(fragmentToHTML(beforeRange.cloneContents())),
@@ -339,6 +334,8 @@
 
     function splitData() {
         if (!data) return;
+        if (pendingEdit) updateTextFromHTML();
+        const commit = beginEditorEdit(track, [data], true);
         const split = getSplitText();
         let splitTime = (data.endTime + data.startTime) / 2;
         if (iscurrent) splitTime = json_data.seekTime;
@@ -356,24 +353,24 @@
         data.endTime = splitTime;
         setSrtItemText(data, split.beforeTxt.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ""));
         data_list.splice(data_id + 1, 0, newdata);
+        commit();
+        onfocus();
         hideMenu();
     }
 
     function unionData() {
+        if (pendingEdit) updateTextFromHTML();
         if (data_list.length <= data_id + 1) return;
         const current = data_list[data_id];
         const next = data_list[data_id + 1];
         if (!current || !next) return;
-        const newData = {
-            startTimeStr: current.startTimeStr,
-            endTimeStr: next.endTimeStr,
-            startTime: current.startTime,
-            endTime: next.endTime,
-            text: "",
-            ref: current.ref ?? {},
-        };
-        setSrtItemText(newData, `${getEditorText(current)}\n　\n${getEditorText(next)}`);
-        data_list.splice(data_id, 2, newData);
+        editClips(track, [current], () => {
+            current.endTimeStr = next.endTimeStr;
+            current.endTime = next.endTime;
+            setSrtItemText(current, `${getEditorText(current)}\n　\n${getEditorText(next)}`);
+            data_list.splice(data_id + 1, 1);
+        }, true);
+        onfocus();
         hideMenu();
     }
 
@@ -385,12 +382,20 @@
     }
 
     onMount(() => {
+        function flush() {
+            if (pendingEdit) updateTextFromHTML();
+        }
         function handleClickOutside(e) {
             if (!e.target.closest(".menu")) hideMenu();
         }
         document.body.addEventListener("mousedown", handleClickOutside);
+        window.addEventListener("srt-editor-flush", flush);
+        window.addEventListener("beforeunload", flush);
         return () => {
+            flush();
             document.body.removeEventListener("mousedown", handleClickOutside);
+            window.removeEventListener("srt-editor-flush", flush);
+            window.removeEventListener("beforeunload", flush);
         };
     });
 </script>
@@ -404,6 +409,7 @@
     onfocus={onfocus}
     onblur={onBlur}
     oncontextmenu={onContextMenu}
+    onbeforeinput={onBeforeInput}
     oninput={onInput}
     oncompositionstart={onCompositionStart}
     oncompositionend={onCompositionEnd}
@@ -421,7 +427,7 @@
 ></div>
 
 {#if contextMenu.show}
-    <div class="menu" bind:this={menuRef} onmousedown={(e) => e.stopPropagation()}>
+    <div class="menu" bind:this={menuRef} onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
         {#if contextMenu.selectedText && !contextMenu.tag}
             <div class="menu-item submenu">
                 タグを付ける ▶

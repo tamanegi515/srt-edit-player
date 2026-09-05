@@ -58,7 +58,7 @@ function getGeneratedVcJsonName(baseName) {
 }
 
 function getDefaultGeneratedTrackName(baseName) {
-    return `${baseName || "sample"}.srt`;
+    return `srt/${baseName || "sample"}.srt`;
 }
 
 
@@ -233,7 +233,7 @@ async function tryGetFileFromPath(dirHandle, path) {
     }
 }
 
-function makeTrack({ id, name, filePath = "", data = [], isImageTrack = false, defaultStyle = "default-style-1" }) {
+function makeTrack({ id, name, filePath = "", data = [], isImageTrack = false, defaultStyle = "default-style-1", loadStatus = "loaded", loadError = null }) {
     const normalizedData = normalizeSrtItems(cloneSrtData(data));
     return {
         id,
@@ -242,8 +242,35 @@ function makeTrack({ id, name, filePath = "", data = [], isImageTrack = false, d
         height: 40,
         default_class: defaultStyle,
         isImageTrack,
+        loadStatus,
+        loadError,
         data: normalizedData,
     };
+}
+
+async function loadTrackData(dirHandle, filePath, inlineData) {
+    const hasInlineData = Array.isArray(inlineData);
+    if (hasInlineData && !filePath) {
+        return { data: cloneSrtData(inlineData), loadStatus: "loaded", loadError: null };
+    }
+    if (!filePath) {
+        return { data: [], loadStatus: "unloaded", loadError: "No subtitle file path" };
+    }
+    try {
+        const file = await getFileFromPath(dirHandle, filePath);
+        if (!file) throw new Error("Subtitle file not found");
+        const text = await file.text();
+        const data = filePath.toLowerCase().endsWith(".json")
+            ? parseSentenceJsonSubtitle(text)
+            : parseSrt(text);
+        return { data, loadStatus: "loaded", loadError: null, name: file.name };
+    } catch (err) {
+        if (hasInlineData && err.name === "NotFoundError") {
+            return { data: cloneSrtData(inlineData), loadStatus: "loaded", loadError: null };
+        }
+        // Parser messages can include file contents; expose only the error category.
+        return { data: [], loadStatus: "error", loadError: `Subtitle read/parse failed (${err.name || "Error"})` };
+    }
 }
 
 export async function getMedia(data,dirHandle) {
@@ -252,7 +279,9 @@ export async function getMedia(data,dirHandle) {
     }
     let audio = null;
     let audioUrl = null;
+    let imageURL = null;
     let duration = 0;
+    try {
     const audiofile = await tryGetFileFromPath(dirHandle, data.audioFilePath);
     if (audiofile) {
       audioUrl = URL.createObjectURL(audiofile);
@@ -268,52 +297,31 @@ export async function getMedia(data,dirHandle) {
 
     const srtDatafiles = [];
     for (const [i, script] of (data.scriptFiles ?? []).entries()) {
-      let srtData = cloneSrtData(script.inlineData);
-      let srtName = script.name || script.filePath || `${data.name}-${i + 1}.srt`;
-      if (!srtData.length && script.filePath) {
-        const scriptFile = await tryGetFileFromPath(dirHandle, script.filePath);
-        if (scriptFile) {
-          srtName = scriptFile.name;
-          const text = await scriptFile.text();
-          try {
-            srtData = script.filePath.toLowerCase().endsWith(".json")
-              ? parseSentenceJsonSubtitle(text)
-              : parseSrt(text);
-          } catch (err) {
-            console.warn("字幕ファイルの解析に失敗しました:", script.filePath, err);
-            srtData = [];
-          }
-        }
-      }
-      extendLastClipToDuration(srtData, duration);
+      const loaded = await loadTrackData(dirHandle, script.filePath, script.inlineData);
+      extendLastClipToDuration(loaded.data, duration);
       srtDatafiles.push(makeTrack({
+        ...loaded,
         id: i,
-        name: srtName,
+        name: loaded.name || script.name || script.filePath || `${data.name}-${i + 1}.srt`,
         filePath: script.filePath,
-        data: srtData,
         defaultStyle: script.defaultStyle ?? script.default_class ?? "default-style-1",
       }));
     }
 
     if (!duration) duration = getDurationFromSrtData(srtDatafiles);
 
-    let imageURL = null;
     let imagePath = null;
     if (data.imageSrtPath) {
-      const imgSrtFile = await tryGetFileFromPath(dirHandle, data.imageSrtPath);
-      if (imgSrtFile) {
-        const imgSrtText = await imgSrtFile.text();
-        const imgSrtparts = parseSrt(imgSrtText);
-        extendLastClipToDuration(imgSrtparts, duration);
-        srtDatafiles.push(makeTrack({
-          id: IMAGE_TRACK_ID_BASE,
-          name: imgSrtFile.name,
-          filePath: data.imageSrtPath,
-          data: imgSrtparts,
-          isImageTrack: true,
-        }));
-        imagePath = imgSrtparts[0]?.text?.replace(/\\/g, "/") ?? null;
-      }
+      const loaded = await loadTrackData(dirHandle, data.imageSrtPath);
+      extendLastClipToDuration(loaded.data, duration);
+      srtDatafiles.push(makeTrack({
+        ...loaded,
+        id: IMAGE_TRACK_ID_BASE,
+        name: loaded.name || data.imageSrtPath,
+        filePath: data.imageSrtPath,
+        isImageTrack: true,
+      }));
+      imagePath = loaded.data[0]?.text?.replace(/\\/g, "/") ?? null;
     }
     if (!imagePath && data.imageFilePath) {
       imagePath = data.imageFilePath.replace(/\\/g, "/");
@@ -340,6 +348,18 @@ export async function getMedia(data,dirHandle) {
       playbackRate: 1,   // 呼び出し元で現在値に上書きされる
       volume: 0.5,       // 同上
     };
+    } catch (err) {
+      try {
+        audio?.pause();
+        if (audio) {
+          audio.removeAttribute("src");
+          audio.load();
+        }
+      } catch { /* Still revoke URLs and preserve the original load failure. */ }
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+      if (imageURL) URL.revokeObjectURL(imageURL);
+      throw err;
+    }
   }
 
 
@@ -521,10 +541,16 @@ function joinSentences(sentences) {
         .join("\r\n");
 }
 
-function parseSentenceJsonSubtitle(text) {
+function parseSentenceJsonSubtitle(text, allowUnrelatedJson = false) {
     const raw = JSON.parse(text);
-    const rows = Array.isArray(raw) ? raw : raw.items;
-    if (!Array.isArray(rows)) return [];
+    const rows = Array.isArray(raw) ? raw : raw?.items;
+    if (!Array.isArray(rows)) {
+        if (allowUnrelatedJson) return null;
+        throw new Error("Invalid subtitle JSON structure");
+    }
+    if (rows.some((row) => !row || !Array.isArray(row.sentences) || row.sentences.some((sentence) => typeof sentence !== "string"))) {
+        throw new Error("Invalid subtitle sentences");
+    }
     return rows.map((row) => ({
         startTimeStr: row.start,
         endTimeStr: row.end,
@@ -621,6 +647,8 @@ export function createSubtitleMediaTrack({ id, name, filePath, data, defaultStyl
         height: 40,
         default_class: defaultStyle,
         isImageTrack: false,
+        loadStatus: "loaded",
+        loadError: null,
         data,
     };
 }
@@ -635,8 +663,8 @@ function ensureProjectHasEditableTrack(data) {
 }
 
 export function getSentenceJsonData(filename, text, options = {}) {
-    const inlineData = parseSentenceJsonSubtitle(text);
-    if (!inlineData.some((row) => Array.isArray(row.sentences))) {
+    const inlineData = parseSentenceJsonSubtitle(text, true);
+    if (!inlineData?.some((row) => Array.isArray(row.sentences))) {
         return null;
     }
 
@@ -654,31 +682,38 @@ export function getSentenceJsonData(filename, text, options = {}) {
 
 export async function saveJsonFile(dirHandle, name = "sample.vc_json", jsondata, subdir = null) {
     if (!dirHandle) return false;
-
+    let writable;
+    let targetDirHandle;
+    let created = false;
     try {
+        const text = JSON.stringify({
+            ...stripInlineDataFromVcJson(jsondata),
+            name,
+        }, null, 2);
         // 保存先ディレクトリの取得
-        const targetDirHandle = subdir
+        targetDirHandle = subdir
             ? await dirHandle.getDirectoryHandle(subdir, { create: true })
             : dirHandle;
 
-        // 書き込むファイルのハンドル
-        const fileHandle = await targetDirHandle.getFileHandle(name, { create: true });
-        const writable = await fileHandle.createWritable();
-
-        // jsondata.name を name に置き換えたコピーを作成
-        const nameWithoutExt = name;
-        const dataToSave = {
-            ...stripInlineDataFromVcJson(jsondata),
-            name: nameWithoutExt,
-        };
-
-        await writable.write(JSON.stringify(dataToSave, null, 2));
+        let fileHandle;
+        try {
+            fileHandle = await targetDirHandle.getFileHandle(name);
+        } catch (err) {
+            if (err.name !== "NotFoundError") throw err;
+            fileHandle = await targetDirHandle.getFileHandle(name, { create: true });
+            created = true;
+        }
+        writable = await fileHandle.createWritable();
+        await writable.write(text);
         await writable.close();
 
         console.log(`保存完了: ${subdir ? `${subdir}/` : ""}${name}`);
         return true;
     } catch (err) {
-        console.error("保存失敗:", err);
+        try { await writable?.abort(); } catch { /* Preserve the save failure. */ }
+        if (created) {
+            try { await targetDirHandle.removeEntry(name); } catch { /* Leave cleanup failure visible on retry. */ }
+        }
         return false;
     }
 }
@@ -784,14 +819,18 @@ export function parseSrt(srt_text) {
     const blockPattern = /(?:^|\r?\n\r?\n)(\d+)\r?\n([\d:,]+)\s-{2}>\s([\d:,]+)\r?\n([\s\S]*?)(?=\r?\n\r?\n\d+\r?\n|$)/g;
 
     const srtList = [];
+    let parsedEnd = 0;
     for (const match of srt_text.matchAll(blockPattern)) {
+        if (srt_text.slice(parsedEnd, match.index).trim()) throw new Error("Invalid SRT block");
         srtList.push(parseSrtBlock({
             id: match[1],
             start: match[2],
             end: match[3],
             body: match[4],
         }));
+        parsedEnd = match.index + match[0].length;
     }
+    if (srt_text.slice(parsedEnd).trim()) throw new Error("Invalid SRT data");
     if (!srtList.length) return [];
     return srtList ? normalizeSrtItems(srtList) : [];
 };
@@ -881,47 +920,115 @@ function serializeSentenceJsonSubtitle(data) {
             ? item.sentences.map((sentence) => normalizeInlineNewlines(sentence).trim()).filter(Boolean)
             : splitTextToSentences(getSrtItemText(item));
         return {
-            start: item.startTimeStr ?? convSecToStr(item.startTime ?? 0),
-            end: item.endTimeStr ?? convSecToStr(item.endTime ?? 0),
+            start: getPersistedTime(item, "start"),
+            end: getPersistedTime(item, "end"),
             sentences,
         };
     }), null, 2);
 }
 
-async function saveTextFileByPath(dirHandle, path, text, subdir = null) {
+function getSubtitlePathParts(path) {
+    const normalizedPath = String(path || "").replace(/\\/g, "/");
+    const parts = normalizedPath.split("/");
+    if (parts.some((part) => !part || part === "." || part === ".." || /[:*?"<>|]/.test(part))) {
+        throw new Error("Invalid relative subtitle path");
+    }
+    return parts;
+}
+
+async function saveTextFileByPath(dirHandle, path, text, createOnly = false) {
     if (!dirHandle) return false;
+    let writable;
+    let created = false;
+    let targetDirHandle = dirHandle;
+    let fileName;
     try {
-        let targetDirHandle = subdir
-            ? await dirHandle.getDirectoryHandle(subdir, { create: true })
-            : dirHandle;
-        const normalizedPath = String(path || "").replace(/\\/g, "/");
-        const parts = normalizedPath.split("/").filter(Boolean);
-        const fileName = parts.pop();
-        if (!fileName) return false;
+        const parts = getSubtitlePathParts(path);
+        fileName = parts.pop();
         for (const part of parts) {
             targetDirHandle = await targetDirHandle.getDirectoryHandle(part, { create: true });
         }
+        if (createOnly) {
+            try {
+                await targetDirHandle.getFileHandle(fileName);
+                return false;
+            } catch (err) {
+                if (err.name !== "NotFoundError") throw err;
+            }
+        }
         const fileHandle = await targetDirHandle.getFileHandle(fileName, { create: true });
-        const writable = await fileHandle.createWritable();
+        created = createOnly;
+        writable = await fileHandle.createWritable();
         await writable.write(text);
         await writable.close();
-        console.log(`保存完了: ${subdir ? `${subdir}/` : ""}${normalizedPath}`);
         return true;
     } catch (err) {
-        console.error("保存失敗", err);
+        try { await writable?.abort(); } catch { /* Preserve the original failure. */ }
+        if (created) {
+            try { await targetDirHandle.removeEntry(fileName); } catch { /* Never remove the parent directory. */ }
+        }
         return false;
     }
 }
 
-export async function saveSubtitleFile(dirHandle, path, data, options = {}) {
-    const normalizedPath = String(path || "subtitle.srt").replace(/\\/g, "/");
-    if (normalizedPath.toLowerCase().endsWith(".json")) {
-        return saveTextFileByPath(dirHandle, normalizedPath, serializeSentenceJsonSubtitle(data));
-    }
+function serializeSubtitle(path, data) {
+    return path.toLowerCase().endsWith(".json")
+        ? serializeSentenceJsonSubtitle(data)
+        : combineToSRT(data);
+}
 
-    const base = normalizedPath.split("/").pop().replace(/\.[^/.]+$/, "") || "subtitle";
-    const srtName = `${base}.srt`;
-    return saveSrtFile(dirHandle, srtName, data, options.srtSubdir ?? "srt");
+export async function saveSubtitleFile(dirHandle, path, data, options = {}) {
+    if (options.loadStatus !== undefined && options.loadStatus !== "loaded") return false;
+    if (!path || !Array.isArray(data)) return false;
+    try {
+        return await saveTextFileByPath(dirHandle, path, serializeSubtitle(path, data));
+    } catch {
+        return false;
+    }
+}
+
+export async function saveSubtitleTrack(dirHandle, track) {
+    if (track?.loadStatus !== "loaded" || !track.file_path) return false;
+    return saveSubtitleFile(dirHandle, track.file_path, track.data, { loadStatus: track.loadStatus });
+}
+
+// Serialize creates across handles so repeated clicks cannot pass the same existence check.
+// File System Access has no atomic exclusive-create primitive against external writers.
+let subtitleCreationQueue = Promise.resolve();
+export async function createSubtitleFile(dirHandle, path, data) {
+    const create = async () => {
+        if (!path || !Array.isArray(data)) return false;
+        try {
+            return await saveTextFileByPath(dirHandle, path, serializeSubtitle(path, data), true);
+        } catch {
+            return false;
+        }
+    };
+    const result = subtitleCreationQueue.then(create);
+    subtitleCreationQueue = result.then(() => undefined, () => undefined);
+    return result;
+}
+
+// The caller must only pass paths successfully created by its current operation.
+export async function removeCreatedSubtitleFile(dirHandle, path) {
+    if (!dirHandle) return false;
+    try {
+        const parts = getSubtitlePathParts(path);
+        const name = parts.pop();
+        let directory = dirHandle;
+        for (const part of parts) directory = await directory.getDirectoryHandle(part);
+        await directory.getFileHandle(name);
+        await directory.removeEntry(name);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function getPersistedTime(item, edge) {
+    const seconds = item[`${edge}Time`] ?? convStrToSec(item[`${edge}TimeStr`]);
+    if (!Number.isFinite(seconds) || seconds < 0) throw new Error("Invalid subtitle time");
+    return convSecToStr(seconds);
 }
 
 
@@ -930,7 +1037,7 @@ export function combineToSRT(data) {
     let id = 1;
     for (const srtPart of data) {
         srtText += id + '\r\n';
-        srtText += srtPart.startTimeStr + ' --> ' + srtPart.endTimeStr;
+        srtText += getPersistedTime(srtPart, "start") + ' --> ' + getPersistedTime(srtPart, "end");
         if (getSrtItemText(srtPart)) {
             srtText += '\r\n' + serializeSrtBodyText(srtPart);
             if (srtPart.text !== "\r\n") srtText += '\r\n\r\n';

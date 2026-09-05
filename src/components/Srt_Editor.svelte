@@ -10,8 +10,9 @@
     } from "../lib/store.svelte";
     import { getCurrentText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
+    import { editClips } from "../lib/editor_history";
     import CustomTextarea from "./Custom_Textarea.svelte";
-    import { onDestroy, onMount } from "svelte";
+    import { onDestroy, onMount, untrack } from "svelte";
 
     let { column, ...props } = $props();
 
@@ -22,6 +23,17 @@
     let editorRefs = $state([]);
     let editorScrollBox = $state();
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
+    let currentIndex = $derived(getCurrentText(srt_data, json_data.seekTime).index);
+
+    $effect(() => {
+        const index = currentIndex;
+        const track = selectedTrack;
+        if (uiState.autoScroll && editorScrollBox && track && index >= 0) {
+            untrack(() => scrollToIndex(json_data.seekTime));
+        } else {
+            lastScrollClip = null;
+        }
+    });
 
     $effect(() => {
         if (!selectedTrack && editableSrtFiles[0]) setEditorColumnTrack(column.id, editableSrtFiles[0].id);
@@ -32,23 +44,44 @@
     }
 
     let isProgrammaticScroll = false;
-    export function scrollToIndex(time) {
+    let scrollTimer;
+    let lastScrollClip = null;
+    let lastScrollTrack = null;
+
+    function finishScroll() {
+        clearTimeout(scrollTimer);
+        isProgrammaticScroll = false;
+    }
+
+    function manualScroll() {
+        finishScroll();
+        lastScrollClip = null;
+        uiState.autoScroll = false;
+    }
+
+    export function scrollToIndex(time, force = false) {
         const index = getCurrentText(selectedTrack?.data ?? [], time).index;
-        const target = editorScrollBox?.querySelectorAll(".editor")?.[index];
+        const clip = srt_data[index];
+        if (!force && clip === lastScrollClip && selectedTrack === lastScrollTrack) return;
+        const target = editorScrollBox?.children[index]?.querySelector(".editor");
         if (index < 0 || !target || !editorScrollBox) return;
-        isProgrammaticScroll = true;
+        lastScrollClip = clip;
+        lastScrollTrack = selectedTrack;
         const targetRect = target.getBoundingClientRect();
         const containerRect = editorScrollBox.getBoundingClientRect();
+        if (!force && targetRect.top >= containerRect.top && targetRect.bottom <= containerRect.bottom) return;
         const targetTop = editorScrollBox.scrollTop + targetRect.top - containerRect.top;
         const centeredTop = targetTop - (editorScrollBox.clientHeight - target.offsetHeight) / 2;
-        editorScrollBox.scrollTo({ top: Math.max(0, centeredTop), behavior: "smooth" });
-        setTimeout(() => {
-            isProgrammaticScroll = false;
-        }, 300);
+        const top = Math.max(0, Math.min(centeredTop, editorScrollBox.scrollHeight - editorScrollBox.clientHeight));
+        if (Math.abs(top - editorScrollBox.scrollTop) < 1) return;
+        isProgrammaticScroll = true;
+        clearTimeout(scrollTimer);
+        editorScrollBox.scrollTo({ top, behavior: "smooth" });
+        scrollTimer = setTimeout(finishScroll, 1000);
     }
 
     function handleExternalScroll(event) {
-        scrollToIndex(event.detail?.time ?? json_data.seekTime);
+        scrollToIndex(event.detail?.time ?? json_data.seekTime, true);
     }
 
     function JumpAudio(index) {
@@ -66,21 +99,25 @@
 
     function setStartTime(id) {
         if (id > 0) {
-            const time = clampBoundary(useAudio.audio?.currentTime ?? 0, srt_data[id - 1].startTime, srt_data[id].endTime);
-            srt_data[id].startTime = time;
-            srt_data[id - 1].endTime = srt_data[id].startTime;
-            srt_data[id].startTimeStr = convSecToStr(srt_data[id].startTime);
-            srt_data[id - 1].endTimeStr = convSecToStr(srt_data[id - 1].endTime);
+            const time = clampBoundary(json_data.seekTime, srt_data[id - 1].startTime, srt_data[id].endTime);
+            editClips(selectedTrack, [srt_data[id], srt_data[id - 1]], () => {
+                srt_data[id].startTime = time;
+                srt_data[id - 1].endTime = srt_data[id].startTime;
+                srt_data[id].startTimeStr = convSecToStr(srt_data[id].startTime);
+                srt_data[id - 1].endTimeStr = convSecToStr(srt_data[id - 1].endTime);
+            });
         }
     }
 
     function setEndTime(id) {
         if (id < srt_data.length - 1) {
-            const time = clampBoundary(useAudio.audio?.currentTime ?? 0, srt_data[id].startTime, srt_data[id + 1].endTime);
-            srt_data[id].endTime = time;
-            srt_data[id + 1].startTime = srt_data[id].endTime;
-            srt_data[id].endTimeStr = convSecToStr(srt_data[id].endTime);
-            srt_data[id + 1].startTimeStr = convSecToStr(srt_data[id + 1].startTime);
+            const time = clampBoundary(json_data.seekTime, srt_data[id].startTime, srt_data[id + 1].endTime);
+            editClips(selectedTrack, [srt_data[id], srt_data[id + 1]], () => {
+                srt_data[id].endTime = time;
+                srt_data[id + 1].startTime = srt_data[id].endTime;
+                srt_data[id].endTimeStr = convSecToStr(srt_data[id].endTime);
+                srt_data[id + 1].startTimeStr = convSecToStr(srt_data[id + 1].startTime);
+            });
         }
     }
 
@@ -89,6 +126,7 @@
     });
 
     onDestroy(() => {
+        clearTimeout(scrollTimer);
         window.removeEventListener("srt-editor-scroll-current", handleExternalScroll);
     });
 </script>
@@ -104,16 +142,28 @@
     </div>
     {/if}
     {#if selectedTrack && hasClips}
+    {#key selectedTrack}
     <div
         class="box"
+        role="region"
+        aria-label="字幕クリップ"
+        tabindex="0"
         bind:this={editorScrollBox}
         data-testid="editor-scroll"
+        onwheel={manualScroll}
+        ontouchmove={manualScroll}
+        onpointerdown={(e) => { if (e.target === editorScrollBox) manualScroll(); }}
+        onkeydown={(e) => {
+            if (!e.target.isContentEditable && ["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(e.key)) manualScroll();
+        }}
+        onscrollend={finishScroll}
         onscroll={() => {
-            if (!isProgrammaticScroll) uiState.autoScroll = false;
+            if (!isProgrammaticScroll) manualScroll();
         }}
     >
-        {#each selectedTrack.data ?? [] as srtdata, index}
+        {#each selectedTrack.data ?? [] as srtdata, index (srtdata)}
             <div class="clip-row">
+                <div class="clip-controls">
                 <button class="dark nmorph_button jump_button" onclick={() => JumpAudio(index)} title="この字幕へ移動" aria-label="この字幕へ移動">
                     <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
                 </button>
@@ -125,9 +175,10 @@
                 {:else}
                     <small class="time-label">{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
                 {/if}
+                </div>
                 <CustomTextarea
-                    track_id={selectedTrack.id}
-                    data_id={index}
+                    track={selectedTrack}
+                    data={srtdata}
                     selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index}
                     onfocus={() => onTextareaFocus(index)}
                     bind:this={editorRefs[index]}
@@ -135,6 +186,7 @@
             </div>
         {/each}
     </div>
+    {/key}
     {:else}
         <div class="empty-editor-state">
             <span class="material-symbols-outlined empty-icon">subtitles</span>
@@ -156,6 +208,7 @@
         min-height: 0;
         display: flex;
         flex-direction: column;
+        gap: 10px;
         padding-top: 3px;
         box-sizing: border-box;
     }
@@ -183,6 +236,13 @@
     .clip-row:last-child {
         border-bottom: 0;
         margin-bottom: 0;
+    }
+    .clip-controls {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-bottom: 6px;
     }
     .time-button {
         height: 24px;
@@ -232,20 +292,19 @@
     }
     .jump_button {
         height: 24px;
-        margin: 0 10px 6px 2px;
+        margin: 0;
     }
     .srt_select {
         height: 28px;
         box-sizing: border-box;
-        width: calc(100% - 4px);
-        margin: 3px 2px 10px 2px;
+        width: 100%;
+        margin: 0;
         color: #b4b4b4;
         background-color: #4242424f;
         border: 1px solid #a3a3a328;
         border-radius: 4px;
     }
     .dark {
-        margin-right: 5px;
         accent-color: #14d3b9;
         background: #313131;
         color: #bebebe;

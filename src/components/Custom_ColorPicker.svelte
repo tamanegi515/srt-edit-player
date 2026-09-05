@@ -129,6 +129,7 @@
         hsv_color_v2 = COLOR.rgbaToHex(v2_rgb, 1);
     }
     function setPosition() {
+        if (!canvasRef) return;
         position.x = (hsv.s / 100) * canvasRef.width;
         position.y = (1 - hsv.v / 100) * canvasRef.height;
     }
@@ -196,10 +197,9 @@
     <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;color:{hex};font-size:22px;vertical-align: middle;-webkit-text-stroke: 1px black;"> format_color_fill </span>
 </button> -->
 <div class="color_picker_button" bind:this={buttonEl}>
-    <input type="checkbox" bind:checked={isOpen} />
-    <div onclick={togglePicker}>
+    <button type="button" class="nmorph_button" aria-label="色を選択" title="色を選択" aria-expanded={isOpen} onclick={togglePicker}>
         <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;color:{hex};font-size:22px;vertical-align: middle;-webkit-text-stroke: 0.4px #bbb;font-weight:bold"> format_color_fill </span>
-    </div>
+    </button>
 </div>
 {#if isOpen}
     <div class="popup" bind:this={popupEl} style="top: {popupPosition.top}px; left: {popupPosition.left}px;">
@@ -209,7 +209,7 @@
             <div class="sample" style="background-color: {hex};"></div>
             <div class="sample" style="background-color: {tmp_hex};"></div>
         </div>
-        <button class="eyedropper-button" onclick={activateEyedropper}>
+        <button class="nmorph_button eyedropper-button" title="スポイト" aria-label="スポイト" onclick={activateEyedropper}>
             <span class="material-symbols-outlined">
                 colorize
                 </span>
@@ -363,14 +363,14 @@
 <style>
     .popup {
         /* position: fixed; */
-        background: rgb(36, 36, 36);
-        border: 1px solid #6d6d6d;
+        background: var(--panel-bg);
+        border: 1px solid var(--border-color);
         border-radius: 5px;
         padding: 12px;
         z-index: 999;
         min-width: 150px;
         max-width: 280px;
-        box-shadow: 0px 15px 30px rgba(172, 172, 172, 0.226);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
         position: absolute;
     }
 
@@ -437,20 +437,11 @@
 
     .eyedropper-button{
         position: absolute;
-        background-color: #434346;
-        border-radius: 3px;
-        border: 1px solid #5f5f5f;
         margin: 0;
         padding: 0;
         vertical-align: middle;
-        bottom: 112px;
+        bottom: 120px;
         right: 15px;
-    }
-    .eyedropper-button:hover{
-        background-color: #4b4a4a;
-    }
-    .eyedropper-button:active{
-        background-color: #282829;
     }
     .eyedropper-button span{
         font-size: 18px;
@@ -552,27 +543,23 @@
     }
 
     input[type="text"]{
-        background-color: #3b3b3b;
-        border-radius: 3px;
-        border: 0;
-        color: #c2c2c2d8;
+        background-color: var(--input-bg);
+        border-radius: var(--control-radius);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
         padding: 3px 10px;
-        box-shadow:
-            inset 2px 2px 3px #0000008e,
-            inset -2px -2px 3px #b1b1b146;
+        box-shadow: var(--input-shadow);
     }
 
     input[type="number"] {
         width: 50px;
         text-align: right;
-        background-color: #3b3b3b;
-        border-radius: 3px;
-        border: 0;
-        color: #c2c2c2d8;
+        background-color: var(--input-bg);
+        border-radius: var(--control-radius);
+        border: 1px solid var(--border-color);
+        color: var(--text-color);
         padding: 3px;
-        box-shadow:
-            inset 2px 2px 3px #0000008e,
-            inset -2px -2px 3px #b1b1b146;
+        box-shadow: var(--input-shadow);
     }
     input[type="range"]::-webkit-slider-thumb {
         appearance: none;
@@ -636,52 +623,13 @@
 
     /* === ボタンを表示するエリア ============================== */
     .color_picker_button {
-        width: 30px; /* ボタンの横幅       */
-        margin: 0px 3px 0px 7px;
-        display: inline-block;
+        width: var(--control-size, var(--control-height));
+        margin: 0;
+        display: inline-flex;
+        vertical-align: middle;
     }
-
-    /* === チェックボックス ==================================== */
-    .color_picker_button input[type="checkbox"] {
-        display: none; /* チェックボックス非表示 */
-    }
-
-    /* === チェックボックスのラベル（標準） ==================== */
-    .color_picker_button div {
-        display: block; /* ボックス要素に変更 */
-        text-align: center; /* 文字位置は中央     */
-        align-content: center;
-        border-radius: 5px; /* 角丸               */
-        height: 30px; /* ボタンの高さ       */
-        font-size: 15px; /* 文字サイズ         */
-        font-weight: bold; /* 太字               */
-        transition: 0.1s; /* ゆっくり変化       */
-        font-family: "HGP明朝E", Arial, Helvetica, sans-serif;
-
-        color: #8d8d8d;
-        margin: 5px 0px;
-        padding: 0px 0px;
-        background: #29292b;
-        cursor: pointer;
-        /* border: 1px solid #29292b; */
-        transition: all 0.1s;
-        box-shadow:
-            4px 4px 8px #020202a4,
-            -4px -4px 8px #434346;
-    }
-
-    /* === ON側のチェックボックスのラベル（ONのとき） ========== */
-    .color_picker_button div span:after {
-        color: rgb(255, 255, 255);
-    }
-    .color_picker_button input[type="checkbox"]:checked + div {
-        color: #1c9199c0;
-        background: #00000067;
-        box-shadow:
-            inset 4px 4px 8px #000000d3,
-            inset -4px -4px 8px #70707067;
-    }
-    .color_picker_button input[type="checkbox"]:checked + div span:after {
-        color: #fff; /* 文字色             */
+    .color_picker_button button[aria-expanded="true"] {
+        border-color: var(--accent);
+        background: var(--input-bg);
     }
 </style>

@@ -2,15 +2,30 @@
 :root {
   /* テーマトークン（全体で一元管理。以前は Track_View.svelte の :root に散在し、
      --primary-color / --back-color は未定義のまま参照されていた） */
-  --bg: #2c2c2c;
-  --panel-bg: #1b1b1b;
-  --border-color: #313131;
-  --shadow-light: rgba(255, 255, 255, 0.932);
-  --shadow-dark: rgb(0, 0, 0);
-  --accent: #5e8bff;
+  --bg: #242425;
+  --panel-bg: var(--bg);
+  --border-color: #414144;
+  --shadow-light: rgba(255, 255, 255, 0.045);
+  --shadow-dark: rgba(0, 0, 0, 0.28);
+  --accent: #2bb9bd;
   --text-color: #ddd;
+  --text-muted: #aeb0b4;
   --primary-color: #0f7d91;
-  --back-color: #2c2c2c;
+  --back-color: var(--bg);
+  --panel-radius: 8px;
+  --panel-padding: 12px;
+  --panel-shadow: 4px 4px 9px var(--shadow-dark), -3px -3px 7px var(--shadow-light);
+  --control-height: 32px;
+  --control-height-compact: 28px;
+  --control-radius: 4px;
+  --control-bg: #303033;
+  --control-hover-bg: #39393d;
+  --control-shadow: none;
+  --input-bg: #222224;
+  --input-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.2);
+  --focus-color: #62cbd0;
+  --space-control: 6px;
+  --space-group: 12px;
 }
 
 html,
@@ -24,19 +39,38 @@ body {
   margin: 0 auto;
   padding: 0rem;
   font-weight: normal;
-  background-color: #242425;
-  color: #a3a3a3;
+  background-color: var(--bg);
+  color: var(--text-muted);
   user-select: none;
 }
 textarea {
   user-select: text;
 }
 
+:where(button, input, select, textarea) {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+:where(input[type="text"], input[type="number"], select) {
+  height: var(--control-size, var(--control-height));
+  padding: 0 var(--space-control);
+  color: var(--text-color);
+  background: var(--input-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--control-radius);
+  box-shadow: var(--input-shadow);
+}
+
+.control-compact {
+  --control-size: var(--control-height-compact);
+}
+
 .editor:focus,
 input[type="text"]:focus,
 input[type="number"]:focus,
 select:focus {
-  outline: 3px solid #001cb98e;
+  outline: 2px solid var(--focus-color);
   outline-offset: -1px;
 }
 .srt_box {
@@ -160,26 +194,58 @@ select:focus {
 
 
 .nmorph_button {
-  color: #11a8a0;
-  color: #8d8d8d;
-  height: 30px;
-  margin: 5px 10px;
-  padding: 0px 8px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-control);
+  flex-shrink: 0;
+  color: var(--text-color);
+  height: var(--control-size, var(--control-height));
+  min-width: var(--control-size, var(--control-height));
+  margin: 0;
+  padding: 0 8px;
   text-align: center;
   vertical-align: middle;
   font-size: 15px;
-  border-radius: 8px;
-  /* background: #2a2a2c; */
-  background: #232325;
+  line-height: 1;
+  border-radius: var(--control-radius);
+  background: var(--control-bg);
   cursor: pointer;
-  border: 0px solid #232325;
-  transition: all 0.1s;
-  box-shadow: 4px 4px 8px #00000073, -4px -4px 8px #434346af;
+  border: 1px solid var(--border-color);
+  transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
+  box-shadow: var(--control-shadow);
 }
 
-.nmorph_button:active {
-  color: #585858;
-  box-shadow: inset 4px 4px 12px #000000b0, inset -4px -4px 12px #373739;
+.nmorph_button:has(> .material-symbols-outlined:only-child) {
+  width: var(--control-size, var(--control-height));
+  padding: 0;
+}
+
+.nmorph_button > .material-symbols-outlined {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.nmorph_button:hover:not(:disabled) {
+  background: var(--control-hover-bg);
+  border-color: #626269;
+}
+
+.nmorph_button:active:not(:disabled) {
+  background: var(--input-bg);
+  box-shadow: var(--input-shadow);
+}
+
+.nmorph_button:focus-visible {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
+}
+
+.nmorph_button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 
@@ -320,16 +386,18 @@ select:focus {
 }
 
 .design-radio-tile-group {
+  display: flex;
   flex-wrap: wrap;
   justify-content: center;
+  gap: var(--space-control);
 }
 
 .design-radio-input-container {
   position: relative;
   display: inline-block;
-  height: 25px;
-  width: 25px;
-  margin-right: 2px;
+  height: var(--control-height-compact);
+  width: var(--control-height-compact);
+  margin: 0;
 }
 
 .design-radio-input-container .radio-button {
@@ -350,14 +418,16 @@ select:focus {
   justify-content: center;
   width: 100%;
   height: 100%;
-  border: 2px solid var(--primary-color);
-  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--control-radius);
+  background: var(--control-bg);
+  box-shadow: var(--control-shadow);
   padding: 2px;
-  transition: transform 300ms ease;
+  transition: background-color 0.1s, border-color 0.1s;
 }
 
 .design-radio-input-container .icon {
-  color: var(--primary-color);
+  color: var(--text-muted);
   margin: 0;
   padding: 0;
   font-size: 21px;
@@ -369,9 +439,14 @@ select:focus {
 }
 .design-radio-input-container .radio-button:checked + .radio-tile {
   background-color: var(--primary-color);
-  border: 2px solid var(--primary-color);
+  border: 1px solid var(--primary-color);
   color: rgb(206, 206, 206);
-  transform: scale(1.1, 1.1);
+  box-shadow: var(--input-shadow);
+}
+
+.design-radio-input-container .radio-button:focus-visible + .radio-tile {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 
@@ -421,8 +496,9 @@ input:checked + .toggle-slider {
   background-color: #20b9b9;
 }
 
-input:focus + .toggle-slider {
-  box-shadow: 0 0 1px #20b9b9;
+input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--focus-color);
+  outline-offset: 2px;
 }
 
 input:checked + .toggle-slider:before {

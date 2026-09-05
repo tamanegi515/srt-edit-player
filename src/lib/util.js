@@ -78,10 +78,11 @@ export async function getFileFromPath(dirHandle, path) {
 
 // 秒単位のfloat数値 を hh:mm:ss,xxx へ変換
 export const convSecToStr = (seconds) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const remainingSeconds = seconds % 60;
-    const milliseconds = Math.floor((remainingSeconds - Math.floor(remainingSeconds)) * 1000);
+    const totalMilliseconds = Math.round(seconds * 1000);
+    const hours = Math.floor(totalMilliseconds / 3600000);
+    const minutes = Math.floor(totalMilliseconds / 60000) % 60;
+    const remainingSeconds = Math.floor(totalMilliseconds / 1000) % 60;
+    const milliseconds = totalMilliseconds % 1000;
 
     const hh = hours.toString().padStart(2, '0');
     const mm = minutes.toString().padStart(2, '0');

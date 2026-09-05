@@ -1,47 +1,36 @@
-# Svelte + Vite
+# SRT Edit Player
 
-This template should help get you started developing with Svelte in Vite.
+Local subtitle editor and media viewer built with Svelte and Vite.
+Use Chromium on localhost with File System Access API permissions for the selected folder.
+Media and subtitle files are processed locally. Font stylesheets may use external font services.
 
-## Recommended IDE Setup
+## Development
 
-[VS Code](https://code.visualstudio.com/) + [Svelte](https://marketplace.visualstudio.com/items?itemName=svelte.svelte-vscode).
-
-## Need an official Svelte framework?
-
-Check out [SvelteKit](https://github.com/sveltejs/kit#readme), which is also powered by Vite. Deploy anywhere with its serverless-first approach and adapt to various platforms, with out of the box support for TypeScript, SCSS, and Less, and easily-added support for mdsvex, GraphQL, PostCSS, Tailwind CSS, and more.
-
-## Technical considerations
-
-**Why use this over SvelteKit?**
-
-- It brings its own routing solution which might not be preferable for some users.
-- It is first and foremost a framework that just happens to use Vite under the hood, not a Vite app.
-
-This template contains as little as possible to get started with Vite + Svelte, while taking into account the developer experience with regards to HMR and intellisense. It demonstrates capabilities on par with the other `create-vite` templates and is a good starting point for beginners dipping their toes into a Vite + Svelte project.
-
-Should you later need the extended capabilities and extensibility provided by SvelteKit, the template has been structured similarly to SvelteKit so that it is easy to migrate.
-
-**Why `global.d.ts` instead of `compilerOptions.types` inside `jsconfig.json` or `tsconfig.json`?**
-
-Setting `compilerOptions.types` shuts out all other types not explicitly listed in the configuration. Using triple-slash references keeps the default TypeScript setting of accepting type information from the entire workspace, while also adding `svelte` and `vite/client` type information.
-
-**Why include `.vscode/extensions.json`?**
-
-Other templates indirectly recommend extensions via the README, but this file allows VS Code to prompt the user to install the recommended extension upon opening the project.
-
-**Why enable `checkJs` in the JS template?**
-
-It is likely that most cases of changing variable types in runtime are likely to be accidental, rather than deliberate. This provides advanced typechecking out of the box. Should you like to take advantage of the dynamically-typed nature of JavaScript, it is trivial to change the configuration.
-
-**Why is HMR not preserving my local component state?**
-
-HMR state preservation comes with a number of gotchas! It has been disabled by default in both `svelte-hmr` and `@sveltejs/vite-plugin-svelte` due to its often surprising behavior. You can read the details [here](https://github.com/sveltejs/svelte-hmr/tree/master/packages/svelte-hmr#preservation-of-local-state).
-
-If you have state that's important to retain within a component, consider creating an external store which would not be replaced by HMR.
-
-```js
-// store.js
-// An extremely simple external store
-import { writable } from 'svelte/store'
-export default writable(0)
+```sh
+npm ci
+npm run dev -- --host 127.0.0.1
 ```
+
+Use the URL printed by Vite. Keep the development server bound to localhost.
+
+## Files and Saving
+
+- `.vc_json` is the project source of truth. `scriptFiles[].filePath` identifies subtitle files; styles and box geometry are project settings, not embedded subtitle contents.
+- When no project exists, folder discovery prefers sentence JSON over SRT and creates a `.vc_json`. Missing audio or images do not prevent subtitle editing.
+- Normal subtitle saving writes to the referenced path. New JSON tracks are created in the project folder; new SRT tracks use `srt/<name>.srt`. Creation refuses an existing file, including files not referenced by the project.
+- The project save button saves settings. The subtitle save button saves subtitle content/times and image-track timing files. A failed or unreadable source is not overwritten as an empty track; partial failures are reported.
+- Whitespace-only editor lines separate sentences. SRT writes a full-width-space separator line; JSON writes separate `sentences` elements. Ordinary line breaks stay inside a sentence. Inline style tags and editor context-menu operations are supported.
+- Unsaved edits are retained in memory across media switches. Changing folders or closing the page warns before discarding changes. This is not persistent crash recovery: save explicitly before restarting the browser.
+- Undo/Redo history is shared by views of the same runtime track and kept separate from other tracks.
+
+## Validation
+
+```sh
+npx playwright install chromium
+npm run build
+npm run test:e2e
+```
+
+Playwright starts a localhost Vite server on port 4173. Automated fixtures cover persistence round trips, failed loads, file collisions, unsaved drafts, editor history, media controls and viewport geometry. They do not require private sample folders.
+
+The build currently emits accessibility warnings for some existing mouse-operated editing controls. A passing build is not an accessibility audit, and synthetic IME events do not replace native Windows IME testing.

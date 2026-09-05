@@ -224,11 +224,6 @@ function tick() {
     }
     const data = activeJsonData;
     if (data) data.seekTime = _audio.currentTime;
-    if (uiState.autoScroll) {
-        for (const ref of useRefs.editorRefs) {
-            if (ref) ref.scrollToIndex(data?.seekTime ?? 0);
-        }
-    }
     _rafId = requestAnimationFrame(tick);
 }
 
@@ -252,6 +247,7 @@ export const useAudio = {
     get audio() { return _audio; },
     /** @param {HTMLAudioElement|null} a @param {string|null} url */
     set(a, url = null) {
+        stopTickLoop();
         if (_audio) {
             _audio.removeEventListener("ended", onAudioStop);
             _audio.removeEventListener("pause", onAudioStop);
@@ -264,6 +260,7 @@ export const useAudio = {
         releaseAudioUrl();
         _audio = a;
         _audioUrl = url;
+        mediaState.media.isPlaying = false;
         if (_audio) {
             _audio.addEventListener("ended", onAudioStop);
             _audio.addEventListener("pause", onAudioStop);
@@ -307,4 +304,3 @@ export const useAudio = {
         if (_audio) _audio.playbackRate = rate;
     }
 };
-

@@ -1,6 +1,7 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import Track from "./Track.svelte";
+    import CustomSlider from "./Custom_Slider.svelte";
     import { mediaState, projectState, uiState, useAudio, useRefs } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
 
@@ -57,7 +58,16 @@
     let playheadX = $derived(
         (projectState.jsonDataList[projectState.mediaIndex]?.seekTime ?? 0) * 1000 * pixel_per_msec - offsetX,
     );
-    let canvas;
+    let canvas = $state();
+    let rulerWidth = $state(0);
+    $effect(() => {
+        if (!timeLineRef) return;
+        const element = timeLineRef;
+        const observer = new ResizeObserver(() => { rulerWidth = element.clientWidth; });
+        rulerWidth = element.clientWidth;
+        observer.observe(element);
+        return () => observer.disconnect();
+    });
     function panelScroll(e) {
         offsetX = e.target.scrollLeft;
         // console.log(offsetX);
@@ -81,10 +91,10 @@
         }
     });
     $effect(() => {
+        if (!canvas || !rulerWidth || !Number.isFinite(pixel_per_msec) || pixel_per_msec <= 0) return;
         const ctx = canvas.getContext("2d");
-        const parentWidth = timeLineRef?.clientWidth || 300; // フォールバックも指定
-        // const width = (canvas.width = zoomRatio*duration);
-        const width = (canvas.width = parentWidth);
+        if (!ctx) return;
+        const width = (canvas.width = rulerWidth);
         const height = (canvas.height = 30);
         const scale_trigger = 80 / pixel_per_msec;
         let scales = { max: 10000, major: 1000, secondary: 500, minor: 100 };
@@ -100,8 +110,9 @@
         // 再生ヘッド（赤線）は DOM 要素（.playhead）で描画。ここでは目盛りのみ。
         ctx.strokeStyle = "#000";
         ctx.lineWidth = 1;
-        const start_miliSec = Math.round(offsetX / pixel_per_msec);
-        for (let milisecond = start_miliSec; milisecond < width / pixel_per_msec + start_miliSec; milisecond += 1) {
+        const firstTick = Math.ceil(offsetX / pixel_per_msec / scales.minor) * scales.minor;
+        const endTime = (offsetX + width) / pixel_per_msec;
+        for (let milisecond = firstTick; milisecond < endTime; milisecond += scales.minor) {
             const x = milisecond * pixel_per_msec + 0.5 - offsetX;
             let lineHeight = 0;
             let lineWidth = 1;
@@ -154,9 +165,9 @@
 
 <div class="track-shell" bind:this = {useRefs.trackRef}>
     <div class="track-controls">
-        拡大率：<input type="range" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
+        拡大率：<CustomSlider aria-label="タイムライン拡大率" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
         AutoScroll：
-        <label class="toggle_switch" style="margin-right: 5px;">
+        <label class="toggle_switch">
             <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
             <span class="toggle-slider"></span>
         </label>
@@ -226,13 +237,8 @@
 }
 
 .track-controls .nmorph_button {
-    height: 24px;
-    margin: 0 6px;
+    --control-size: var(--control-height-compact);
     padding: 0 8px;
-}
-
-.track-controls input[type="range"] {
-    width: 130px;
 }
 
 /* トラックビュー全体 */
