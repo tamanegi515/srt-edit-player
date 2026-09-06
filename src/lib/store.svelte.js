@@ -1,5 +1,7 @@
 ﻿import { getDefaultJsonData, getDefaultMedia } from "./data_process";
 
+import { getBlock } from "./subtitle_blocks";
+
 export const colorPalette = ["#da5740", "#4282b6", "#62cc62", "#e9d566", "#894dc2", "#d85d9f", "#47ccce"];
 
 export const projectState = $state({
@@ -19,10 +21,17 @@ export const mediaState = $state({
 export const selectionState = $state({
     trackId: null,
     selectedTrackId: null,
+    overlayClipIndex: null,
+    overlayBlockId: null,
     styleKey: null,
     editorTrackId: null,
     editorClipIndex: null,
+    editorBlockId: null,
 });
+
+// Keep identity as well as the public index so structural edits cannot retarget a selection.
+let overlayClip = $state.raw(null);
+let editorClip = $state.raw(null);
 
 export const uiState = $state({
     viewSrtFrame: false,
@@ -73,19 +82,46 @@ export function activeTrackId() {
 export function activeStyleKey() {
     const data = activeJsonData;
     if (selectionState.styleKey && data?.styles?.[selectionState.styleKey]) return selectionState.styleKey;
-    const track = data?.scriptFiles?.[activeTrackId()];
-    if (track?.defaultStyle && data?.styles?.[track.defaultStyle]) return track.defaultStyle;
+    const defaultStyle = activeBlockLayout()?.defaultStyle ?? data?.scriptFiles?.[activeTrackId()]?.defaultStyle;
+    if (defaultStyle && data?.styles?.[defaultStyle]) return defaultStyle;
     return Object.keys(data?.styles ?? {})[0] ?? "dummy";
 }
 
 export function selectTrack(trackId) {
     const nextTrackId = Number.isInteger(trackId) ? trackId : firstEditableTrackId();
+    if (selectionState.trackId !== nextTrackId) {
+        clearOverlaySelection();
+        selectionState.editorTrackId = null;
+        selectionState.editorClipIndex = null;
+        selectionState.editorBlockId = null;
+        editorClip = null;
+    }
     selectionState.trackId = nextTrackId;
 }
 
-export function selectOverlayTrack(trackId, styleKey = null) {
+export function activeBlockTarget() {
+    const track = editableTracks.find((item) => item.id === activeTrackId());
+    if (!track) return null;
+    const overlay = selectionState.selectedTrackId === track.id;
+    if (overlay && selectionState.overlayClipIndex === null) return null;
+    if (!overlay && selectionState.editorTrackId !== track.id) return null;
+    const clip = track.data[overlay ? selectionState.overlayClipIndex : selectionState.editorClipIndex];
+    if (!clip || clip !== (overlay ? overlayClip : editorClip)) return null;
+    const body = getBlock(clip, overlay ? selectionState.overlayBlockId : selectionState.editorBlockId);
+    return body ? { track, clip, body } : null;
+}
+
+export function activeBlockLayout() {
+    return activeBlockTarget()?.body.layout ?? activeJsonData?.scriptFiles?.[activeTrackId()];
+}
+
+export function selectOverlayTrack(trackId, styleKey = null, clipIndex = null, blockId = null) {
     selectTrack(trackId);
     selectionState.selectedTrackId = selectionState.trackId;
+    const track = editableTracks.find((item) => item.id === selectionState.trackId);
+    overlayClip = Number.isInteger(clipIndex) ? track?.data[clipIndex] ?? null : null;
+    selectionState.overlayClipIndex = overlayClip ? clipIndex : null;
+    selectionState.overlayBlockId = overlayClip && getBlock(overlayClip, blockId) ? blockId : null;
     if (styleKey && activeJsonData?.styles?.[styleKey]) selectionState.styleKey = styleKey;
 }
 
@@ -96,6 +132,9 @@ export function selectStyle(styleKey) {
 
 export function clearOverlaySelection() {
     selectionState.selectedTrackId = null;
+    selectionState.overlayClipIndex = null;
+    selectionState.overlayBlockId = null;
+    overlayClip = null;
 }
 
 export function createStyleKey(styleKey, baseStyleKey = null) {
@@ -118,18 +157,24 @@ export function createStyleKey(styleKey, baseStyleKey = null) {
     return { ok: true, message: "" };
 }
 
-export function selectEditorClip(trackId, clipIndex) {
+export function selectEditorClip(trackId, clipIndex, blockId = null) {
     selectTrack(trackId);
+    clearOverlaySelection();
     selectionState.editorTrackId = selectionState.trackId;
-    selectionState.editorClipIndex = clipIndex;
+    const track = editableTracks.find((item) => item.id === selectionState.trackId);
+    editorClip = Number.isInteger(clipIndex) ? track?.data[clipIndex] ?? null : null;
+    selectionState.editorClipIndex = editorClip ? clipIndex : null;
+    selectionState.editorBlockId = editorClip && getBlock(editorClip, blockId) ? blockId : null;
 }
 
 export function resetInteractionState() {
     selectionState.trackId = firstEditableTrackId();
-    selectionState.selectedTrackId = null;
+    clearOverlaySelection();
     selectionState.styleKey = activeStyleKey();
     selectionState.editorTrackId = null;
     selectionState.editorClipIndex = null;
+    selectionState.editorBlockId = null;
+    editorClip = null;
     editorLayoutState.columns = [{ id: 1, width: 500, trackId: firstEditableTrackId() }];
     editorLayoutState.nextColumnId = 2;
 }
@@ -157,9 +202,8 @@ export function addSubtitleTrack(scriptFile, track) {
     const editable = mediaState.media.srt_data.filter((item) => !item.isImageTrack);
     mediaState.media.srt_data = [...editable, track, ...imageTracks];
     selectTrack(track.id);
-    selectionState.selectedTrackId = track.id;
-    selectionState.editorTrackId = track.id;
-    selectionState.editorClipIndex = 0;
+    selectEditorClip(track.id, 0);
+    selectOverlayTrack(track.id, null, 0);
     for (const column of editorLayoutState.columns) {
         column.trackId = track.id;
         break;
@@ -185,9 +229,11 @@ export function setEditorColumnTrack(columnId, trackId) {
     const nextTrackId = Number(trackId);
     if (column) column.trackId = nextTrackId;
     selectTrack(nextTrackId);
-    selectionState.selectedTrackId = null;
+    clearOverlaySelection();
     selectionState.editorTrackId = null;
     selectionState.editorClipIndex = null;
+    selectionState.editorBlockId = null;
+    editorClip = null;
 }
 
 // DOM refs are intentionally separated from app state. They are imperative integration points only.

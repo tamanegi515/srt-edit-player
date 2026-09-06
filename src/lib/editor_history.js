@@ -1,6 +1,14 @@
 // A source array is the runtime identity, shared by aliases but never by reused IDs.
 const histories = new WeakMap();
-const fields = ["text", "sentences", "startTime", "endTime", "startTimeStr", "endTimeStr"];
+const fields = ["text", "sentences", "startTime", "endTime", "startTimeStr", "endTimeStr", "layout", "additionalBlocks"];
+
+function cloneValue(value) {
+    if (Array.isArray(value)) return value.map(cloneValue);
+    if (value && typeof value === "object") {
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneValue(item)]));
+    }
+    return value;
+}
 
 function historyFor(track) {
     let history = histories.get(track.data);
@@ -11,8 +19,32 @@ function historyFor(track) {
     return history;
 }
 
+// A source conversion forks commands as well as data; aliases keep their own history.
+export function forkEditorHistory(sourceData, targetData, makeReactive = (value) => value) {
+    const source = histories.get(sourceData);
+    if (!source) return;
+    const clips = new Map(sourceData.map((clip, index) => [clip, targetData[index]]));
+    const mappedClip = (clip) => {
+        if (!clips.has(clip)) {
+            const { ref, ...values } = clip;
+            clips.set(clip, makeReactive(cloneValue(values)));
+        }
+        return clips.get(clip);
+    };
+    const command = (entry) => ({
+        clip: mappedClip(entry.clip),
+        before: entry.before?.map(mappedClip) ?? null,
+        after: entry.after?.map(mappedClip) ?? null,
+        changes: entry.changes.map((change) => ({
+            ...change, clip: mappedClip(change.clip),
+            before: cloneValue(change.before), after: cloneValue(change.after),
+        })),
+    });
+    histories.set(targetData, { undo: source.undo.map(command), redo: source.redo.map(command) });
+}
+
 function snapshot(clip) {
-    return Object.fromEntries(fields.map((key) => [key, Array.isArray(clip[key]) ? [...clip[key]] : clip[key]]));
+    return Object.fromEntries(fields.map((key) => [key, cloneValue(clip[key])]));
 }
 
 export function beginEditorEdit(track, clips, structural = false) {
@@ -52,7 +84,7 @@ export function replayEditorEdit(track, redo = false) {
     for (const { clip, key, ...values } of command.changes) {
         const value = values[side];
         if (value === undefined) delete clip[key];
-        else clip[key] = Array.isArray(value) ? [...value] : value;
+        else clip[key] = cloneValue(value);
     }
     // Keep the original clip objects so keyed views and earlier commands stay attached.
     if (command[side]) track.data.splice(0, track.data.length, ...command[side]);

@@ -11,19 +11,31 @@
     import { getCurrentText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
     import { editClips } from "../lib/editor_history";
+    import { getClipBlocks } from "../lib/subtitle_blocks";
     import CustomTextarea from "./Custom_Textarea.svelte";
-    import { onDestroy, onMount, untrack } from "svelte";
+    import { onDestroy, onMount, tick, untrack } from "svelte";
 
-    let { column, ...props } = $props();
+    let { column, onsplitbox = () => {}, ...props } = $props();
 
     let editableSrtFiles = $derived(mediaState.media.srt_data.filter((track) => !track.isImageTrack));
     let selectedTrack = $derived(editableSrtFiles.find((track) => track.id === column.trackId) ?? editableSrtFiles[0]);
     let srt_data = $derived(selectedTrack?.data ?? []);
     let hasClips = $derived((selectedTrack?.data?.length ?? 0) > 0);
-    let editorRefs = $state([]);
+    let editorRefs = $state({});
     let editorScrollBox = $state();
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
     let currentIndex = $derived(getCurrentText(srt_data, json_data.seekTime).index);
+    const editorKey = (index, blockId = null) => JSON.stringify([index, blockId]);
+
+    async function focusBlock(index, blockId) {
+        await tick();
+        editorRefs[editorKey(index, blockId)]?.focusEditor();
+    }
+
+    async function splitBox(request) {
+        const result = await onsplitbox(request);
+        if (result) await focusBlock(result.index, result.blockId);
+    }
 
     $effect(() => {
         const index = currentIndex;
@@ -88,9 +100,9 @@
         useAudio.seek(selectedTrack.data[index].startTime);
     }
 
-    function onTextareaFocus(index) {
+    function onTextareaFocus(index, blockId = null) {
         if (!selectedTrack) return;
-        selectEditorClip(selectedTrack.id, index);
+        selectEditorClip(selectedTrack.id, index, blockId);
     }
 
     function clampBoundary(time, min, max) {
@@ -175,14 +187,38 @@
                 {:else}
                     <small class="time-label">{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
                 {/if}
+                <button type="button" class="nmorph_button block-action" title="表示ボックスを分割" aria-label="表示ボックスを分割"
+                    onmousedown={(e) => e.preventDefault()}
+                    onclick={() => editorRefs[editorKey(index, selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index ? selectionState.editorBlockId : null)]?.splitIntoBox()}>
+                    <span class="material-symbols-outlined">splitscreen</span>
+                </button>
                 </div>
+                {#each getClipBlocks(srtdata) as block, blockIndex (block.id ?? "primary")}
+                <div class="block-editor" data-block-id={block.id ?? "primary"}>
+                {#if srtdata.additionalBlocks?.length}
+                    <div class="block-heading">
+                        <span>箱 {blockIndex + 1}</span>
+                        {#if block.id !== null}
+                        <button type="button" class="nmorph_button block-action" title="前の箱と結合" aria-label="前の箱と結合"
+                            onmousedown={(e) => e.preventDefault()}
+                            onclick={() => editorRefs[editorKey(index, block.id)]?.mergeWithPreviousBox()}>
+                            <span class="material-symbols-outlined">merge</span>
+                        </button>
+                        {/if}
+                    </div>
+                {/if}
                 <CustomTextarea
                     track={selectedTrack}
                     data={srtdata}
-                    selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index}
-                    onfocus={() => onTextareaFocus(index)}
-                    bind:this={editorRefs[index]}
+                    blockId={block.id}
+                    onsplitbox={splitBox}
+                    onblockfocus={(id) => focusBlock(index, id)}
+                    selected={selectionState.editorTrackId === selectedTrack.id && selectionState.editorClipIndex === index && (selectionState.editorBlockId ?? null) === block.id}
+                    onfocus={() => onTextareaFocus(index, block.id)}
+                    bind:this={editorRefs[editorKey(index, block.id)]}
                 />
+                </div>
+                {/each}
             </div>
         {/each}
     </div>
@@ -202,6 +238,17 @@
 </div>
 
 <style>
+    .block-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 24px;
+        padding: 0 3px;
+        font-size: 12px;
+    }
+    .block-action {
+        --control-size: 24px;
+    }
     .srt-editor {
         /* 高さは親（.editor-column-body）の flex stretch に任せる。
            height:100% + margin だと親を数px超えて余計な縦スクロールバーが出る */

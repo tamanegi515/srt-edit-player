@@ -4,10 +4,13 @@
     import { beginEditorEdit, editClips, replayEditorEdit } from "../lib/editor_history";
     import { getSrtItemText, setSrtItemText } from "../lib/data_process";
     import { convSecToStr } from "../lib/util";
+    import { getBlock } from "../lib/subtitle_blocks";
+    import { appendClipBlocks, mergeSubtitleBlock, partitionClipBlocks } from "../lib/block_editing";
 
     const styleList = useStyleList();
 
-    let { track, data, selected = false, onfocus = () => {} } = $props();
+    let { track, data, blockId = null, selected = false, onfocus = () => {}, onsplitbox = () => {}, onblockfocus = () => {} } = $props();
+    let body = $derived(getBlock(data, blockId));
 
     const tagList = $derived.by(() => styleList.map((style) => style.name));
     let editorRef = $state();
@@ -135,7 +138,7 @@
                 show: true,
                 x,
                 y,
-                range: null,
+                range: selection?.rangeCount && editorRef?.contains(selection.anchorNode) ? selection.getRangeAt(0).cloneRange() : null,
                 tag: target.dataset.tag,
                 target,
                 selectedText: "",
@@ -171,27 +174,27 @@
     }
 
     function updateTextFromHTML() {
-        if (!data || !editorRef) return;
+        if (!body || !editorRef) return;
         pushUndo();
         const raw = extractTextFromHTML(editorRef.innerHTML);
-        setSrtItemText(data, raw);
+        setSrtItemText(body, raw);
         // The subtitle normalizer trims sentence edges. Keep live whitespace so Enter
         // and spaces remain editable, synchronizable and independently undoable.
-        if (data.sentences?.length) {
-            data.sentences[0] = (raw.match(/^\s*/)?.[0] ?? "") + data.sentences[0];
-            const last = data.sentences.length - 1;
-            data.sentences[last] += raw.match(/\s*$/)?.[0] ?? "";
-            data.text = data.sentences.join("\r\n");
+        if (body.sentences?.length) {
+            body.sentences[0] = (raw.match(/^\s*/)?.[0] ?? "") + body.sentences[0];
+            const last = body.sentences.length - 1;
+            body.sentences[last] += raw.match(/\s*$/)?.[0] ?? "";
+            body.text = body.sentences.join("\r\n");
         } else {
-            data.text = raw;
+            body.text = raw;
         }
         pendingEdit?.();
         pendingEdit = null;
     }
 
     $effect(() => {
-        if (!editorRef || !data) return;
-        const text = getEditorText(data);
+        if (!editorRef || !body) return;
+        const text = getEditorText(body);
         // Only an active composition owns uncommitted DOM; ordinary input commits synchronously.
         if (isComposing || pendingEdit) return;
         if (extractTextFromHTML(editorRef.innerHTML) !== text) {
@@ -262,8 +265,8 @@
     function onBlur() {
         if (isComposing) return;
         if (pendingEdit) updateTextFromHTML();
-        if (!data || !editorRef) return;
-        const text = getEditorText(data);
+        if (!body || !editorRef) return;
+        const text = getEditorText(body);
         if (extractTextFromHTML(editorRef.innerHTML) !== text) {
             editorRef.innerHTML = formatForDisplay(text);
         }
@@ -314,12 +317,13 @@
 
     function getSplitText() {
         const sel = window.getSelection();
-        if (!sel || sel.rangeCount === 0 || !editorRef) return { beforeTxt: getEditorText(data), afterTxt: "" };
+        if (!sel || sel.rangeCount === 0 || !editorRef) return { beforeTxt: getEditorText(body), afterTxt: "" };
 
-        const range = contextMenu.range ?? sel.getRangeAt(0);
+        const range = (contextMenu.range ?? sel.getRangeAt(0)).cloneRange();
         if (!editorRef.contains(range.commonAncestorContainer)) {
-            return { beforeTxt: getEditorText(data), afterTxt: "" };
+            return { beforeTxt: getEditorText(body), afterTxt: "" };
         }
+        range.collapse(true);
 
         const beforeRange = range.cloneRange();
         beforeRange.setStart(editorRef, 0);
@@ -330,6 +334,35 @@
             beforeTxt: extractTextFromHTML(fragmentToHTML(beforeRange.cloneContents())),
             afterTxt: extractTextFromHTML(fragmentToHTML(afterRange.cloneContents())),
         };
+    }
+
+    export function focusEditor() {
+        if (!editorRef) return;
+        editorRef.focus();
+        const range = document.createRange();
+        range.selectNodeContents(editorRef);
+        range.collapse(true);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+
+    export function splitIntoBox() {
+        if (!body) return;
+        if (pendingEdit) updateTextFromHTML();
+        const split = getSplitText();
+        hideMenu();
+        onsplitbox({ track, data, blockId, before: split.beforeTxt, after: split.afterTxt });
+    }
+
+    export function mergeWithPreviousBox() {
+        if (blockId === null || !body) return;
+        if (pendingEdit) updateTextFromHTML();
+        let previousId;
+        editClips(track, [data], () => { previousId = mergeSubtitleBlock(data, blockId); });
+        hideMenu();
+        selectEditorClip(track.id, data_id, previousId);
+        onblockfocus(previousId);
     }
 
     function splitData() {
@@ -348,10 +381,11 @@
             text: "",
             ref: {},
         };
-        setSrtItemText(newdata, split.afterTxt.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ""));
+        partitionClipBlocks(data, blockId,
+            split.beforeTxt.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ""),
+            split.afterTxt.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ""), newdata);
         data.endTimeStr = splitTimeStr;
         data.endTime = splitTime;
-        setSrtItemText(data, split.beforeTxt.replace(/^[\s\u3000]+|[\s\u3000]+$/g, ""));
         data_list.splice(data_id + 1, 0, newdata);
         commit();
         onfocus();
@@ -367,7 +401,7 @@
         editClips(track, [current], () => {
             current.endTimeStr = next.endTimeStr;
             current.endTime = next.endTime;
-            setSrtItemText(current, `${getEditorText(current)}\n　\n${getEditorText(next)}`);
+            appendClipBlocks(current, next, json_data.scriptFiles[track.id]);
             data_list.splice(data_id + 1, 1);
         }, true);
         onfocus();
@@ -405,6 +439,7 @@
     tabindex="0"
     class="editor {iscurrent ? 'current' : ''} {selected ? 'selected' : ''}"
     contenteditable
+    data-block-id={blockId ?? "primary"}
     bind:this={editorRef}
     onfocus={onfocus}
     onblur={onBlur}
@@ -428,6 +463,12 @@
 
 {#if contextMenu.show}
     <div class="menu" bind:this={menuRef} onmousedown={(e) => { e.preventDefault(); e.stopPropagation(); }}>
+        {#if !contextMenu.selectedText}
+            <div role="button" tabindex="0" class="menu-item" onclick={splitIntoBox} onkeydown={(e) => menuKey(e, splitIntoBox)}>表示ボックスを分割</div>
+        {/if}
+        {#if blockId !== null}
+            <div role="button" tabindex="0" class="menu-item" onclick={mergeWithPreviousBox} onkeydown={(e) => menuKey(e, mergeWithPreviousBox)}>前の箱と結合</div>
+        {/if}
         {#if contextMenu.selectedText && !contextMenu.tag}
             <div class="menu-item submenu">
                 タグを付ける ▶

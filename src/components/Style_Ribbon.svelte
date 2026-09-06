@@ -1,10 +1,15 @@
 ﻿<script>
     import { wheelAdjust } from "../lib/util";
+    import { onDestroy } from "svelte";
+    import { beginEditorEdit } from "../lib/editor_history";
+    import { createBlockLayout } from "../lib/subtitle_blocks";
     import CustomColorPicker from "./Custom_ColorPicker.svelte";
     import CustomSlider from "./Custom_Slider.svelte";
     import {
         activeStyleKey,
         activeTrackId,
+        activeBlockLayout,
+        activeBlockTarget,
         createStyleKey,
         projectState,
         selectionState,
@@ -18,6 +23,9 @@
     const scriptFiles = $derived(projectState.jsonDataList[projectState.mediaIndex].scriptFiles);
     let currentSrt = $derived(activeTrackId());
     let currentStyleKey = $derived(activeStyleKey());
+    let selectedLayout = $derived(activeBlockLayout());
+    let displayLayout = $derived({ ...scriptFiles[currentSrt], ...selectedLayout });
+    let layoutGesture = null;
 
     const style_list = $derived.by(()=>useStyleList());
     let proportionalFonts = $state(getProportionalFonts());
@@ -47,12 +55,48 @@
         // 変更イベントのフックが必要ならここに
     }
 
+    function startLayoutEdit(target) {
+        return target && (target.body.layout || target.body !== target.clip || target.clip.additionalBlocks?.length)
+            ? beginEditorEdit(target.track, [target.clip]) : null;
+    }
+
+    function beginLayoutGesture() {
+        finishLayoutGesture();
+        const target = activeBlockTarget();
+        layoutGesture = { layout: selectedLayout, body: target?.body, clip: target?.clip, commit: startLayoutEdit(target) };
+    }
+
+    function finishLayoutGesture() {
+        layoutGesture?.commit?.();
+        layoutGesture = null;
+    }
+
+    function editLayout(field, value) {
+        if (!selectedLayout || displayLayout[field] === value) return;
+        const target = activeBlockTarget();
+        if (layoutGesture && (layoutGesture.layout !== selectedLayout
+            || layoutGesture.body !== target?.body || layoutGesture.clip !== target?.clip)) return;
+        const commit = layoutGesture ? null : startLayoutEdit(target);
+        let writableLayout = selectedLayout;
+        if (target && !target.body.layout && (target.body !== target.clip || target.clip.additionalBlocks?.length)) {
+            target.body.layout = createBlockLayout(scriptFiles[currentSrt]);
+            writableLayout = target.body.layout;
+            if (layoutGesture) layoutGesture.layout = writableLayout;
+        }
+        writableLayout[field] = value;
+        commit?.();
+    }
+
+    onDestroy(finishLayoutGesture);
+
     function addStyle() {
         const result = createStyleKey(newStyleKey, currentStyleKey);
         styleCreateError = result.message;
         if (result.ok) newStyleKey = "";
     }
 </script>
+
+<svelte:window onpointerup={finishLayoutGesture} onpointercancel={finishLayoutGesture} onblur={finishLayoutGesture} />
 
 <div class="ribbonview">
     <!-- 基本書式エリア -->
@@ -66,22 +110,22 @@
 
                         <label>
                             テキスト揃え:
-                            <select bind:value={scriptFiles[currentSrt].textAlign}>
-                                <option value="left">{scriptFiles[currentSrt].textRotate == "horizontal-tb" ? "左揃え" : "上揃え"}</option>
+                            <select value={displayLayout.textAlign} onchange={(e) => editLayout("textAlign", e.currentTarget.value)}>
+                                <option value="left">{displayLayout.textRotate == "horizontal-tb" ? "左揃え" : "上揃え"}</option>
                                 <option value="center">中央揃え</option>
-                                <option value="right">{scriptFiles[currentSrt].textRotate == "horizontal-tb" ? "右揃え" : "下揃え"}</option>
+                                <option value="right">{displayLayout.textRotate == "horizontal-tb" ? "右揃え" : "下揃え"}</option>
                             </select>
                         </label>
                         <div class="design-radio-container">
                             <div class="design-radio-tile-group">
                                 <div class="design-radio-input-container">
-                                    <input class="radio-button" bind:group={scriptFiles[currentSrt].textRotate} type="radio" name="tile" id="tile1" value="horizontal-tb" checked />
+                                    <input class="radio-button" checked={displayLayout.textRotate === "horizontal-tb"} onchange={() => editLayout("textRotate", "horizontal-tb")} type="radio" name="tile" id="tile1" value="horizontal-tb" />
                                     <label class="radio-tile" for="tile1">
                                         <span class="material-symbols-outlined icon"> text_rotation_none </span>
                                     </label>
                                 </div>
                                 <div class="design-radio-input-container">
-                                    <input class="radio-button" bind:group={scriptFiles[currentSrt].textRotate} type="radio" name="tile" id="tile2" value="vertical-rl" />
+                                    <input class="radio-button" checked={displayLayout.textRotate === "vertical-rl"} onchange={() => editLayout("textRotate", "vertical-rl")} type="radio" name="tile" id="tile2" value="vertical-rl" />
                                     <label class="radio-tile" for="tile2">
                                         <span class="material-symbols-outlined icon"> text_rotate_vertical </span>
                                     </label>
@@ -91,16 +135,14 @@
                         <br />
                         <label
                             >左右:
-                            <!-- <input type="range" bind:value={scriptFiles[currentSrt].boxAlignX} min="0" max="100" step="1" use:wheelAdjust={{ min: 0, step: 1, shiftStep: 10 }} /> -->
-                            <CustomSlider variant="compact" bind:value={scriptFiles[currentSrt].boxAlignX} min="0" max="100" step="1"></CustomSlider>
-                            {scriptFiles[currentSrt].boxAlignX}%
+                            <CustomSlider variant="compact" value={displayLayout.boxAlignX} onpointerdown={beginLayoutGesture} oninput={(e) => editLayout("boxAlignX", e.currentTarget.valueAsNumber)} min="0" max="100" step="1"></CustomSlider>
+                            {displayLayout.boxAlignX}%
                         </label>
                         <br />
                         <label
                             >上下:
-                            <!-- <input type="range" bind:value={scriptFiles[currentSrt].boxAlignY} min="0" max="100" step="1" use:wheelAdjust={{ min: 0, step: 1, shiftStep: 10 }} /> -->
-                            <CustomSlider variant="compact" bind:value={scriptFiles[currentSrt].boxAlignY} min="0" max="100" step="1"></CustomSlider>
-                            {scriptFiles[currentSrt].boxAlignY}%
+                            <CustomSlider variant="compact" value={displayLayout.boxAlignY} onpointerdown={beginLayoutGesture} oninput={(e) => editLayout("boxAlignY", e.currentTarget.valueAsNumber)} min="0" max="100" step="1"></CustomSlider>
+                            {displayLayout.boxAlignY}%
                         </label>
                     </div>
                 </td>

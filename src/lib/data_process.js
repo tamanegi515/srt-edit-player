@@ -1,4 +1,5 @@
 import { getFileFromPath, convSecToStr, convStrToSec, COLOR } from "./util";
+import { getClipBlocks, hasClipBlockExtensions, validateClipBlocks } from "./subtitle_blocks";
 
 const AUDIO_EXTENSIONS = [".mp3", ".wav", ".m4a", ".aac", ".flac", ".ogg"];
 const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif"];
@@ -80,7 +81,21 @@ export function getDefaultMedia(){
 }
 
 function cloneSrtData(data) {
-    return (data ?? []).map((item) => ({ ...item, ref: item.ref ?? {} }));
+    return (data ?? []).map((item) => ({ ...item, ...copyClipBlockExtensions(item), ref: item.ref ?? {} }));
+}
+
+function copyClipBlockExtensions(clip) {
+    validateClipBlocks(clip);
+    const extension = {};
+    if (Object.prototype.hasOwnProperty.call(clip, "layout")) extension.layout = { ...clip.layout };
+    if (Object.prototype.hasOwnProperty.call(clip, "additionalBlocks")) {
+        extension.additionalBlocks = clip.additionalBlocks.map((block) => ({
+            ...block,
+            ...(block.sentences ? { sentences: [...block.sentences] } : {}),
+            ...(block.layout ? { layout: { ...block.layout } } : {}),
+        }));
+    }
+    return extension;
 }
 
 function normalizeInlineNewlines(text) {
@@ -189,6 +204,7 @@ function serializeJsonSrtItem(item) {
     const text = sentences.length > 1 ? joinSentencesWithParagraphBreak(sentences) : normalizeInlineNewlines(item?.text ?? sentences[0] ?? "");
     return {
         ...item,
+        ...copyClipBlockExtensions(item),
         text,
         ...(sentences.length > 1 ? { sentences } : {}),
     };
@@ -429,6 +445,9 @@ export function getVCJsonData(text, filename = "sample.vc_json") {
     const def = getDefaultJsonData();
     const rawStyles = Object.entries(raw.styles || {});
     const rawScriptFiles = raw.scriptFiles || raw.srtFiles || raw.jsonFiles || [];
+    for (const script of rawScriptFiles) {
+        if (Array.isArray(script.inlineData)) script.inlineData.forEach(validateClipBlocks);
+    }
     const { srtFiles, jsonFiles, ...rawWithoutLegacyScriptFiles } = raw;
 
     const result = {
@@ -548,7 +567,9 @@ function parseSentenceJsonSubtitle(text, allowUnrelatedJson = false) {
         if (allowUnrelatedJson) return null;
         throw new Error("Invalid subtitle JSON structure");
     }
-    if (rows.some((row) => !row || !Array.isArray(row.sentences) || row.sentences.some((sentence) => typeof sentence !== "string"))) {
+    if (rows.some((row) => !row || (Object.prototype.hasOwnProperty.call(row, "sentences")
+        ? !Array.isArray(row.sentences) || row.sentences.some((sentence) => typeof sentence !== "string")
+        : typeof row.text !== "string"))) {
         throw new Error("Invalid subtitle sentences");
     }
     return rows.map((row) => ({
@@ -556,8 +577,11 @@ function parseSentenceJsonSubtitle(text, allowUnrelatedJson = false) {
         endTimeStr: row.end,
         startTime: convStrToSec(row.start),
         endTime: convStrToSec(row.end),
-        sentences: (row.sentences ?? []).map((sentence) => normalizeInlineNewlines(sentence).trim()).filter((sentence) => sentence.length > 0),
-        text: joinSentences(row.sentences),
+        ...(Array.isArray(row.sentences) ? {
+            sentences: row.sentences.map((sentence) => normalizeInlineNewlines(sentence).trim()).filter((sentence) => sentence.length > 0),
+            text: joinSentences(row.sentences),
+        } : { text: normalizeInlineNewlines(row.text) }),
+        ...copyClipBlockExtensions(row),
         ref: {},
     }));
 }
@@ -664,7 +688,7 @@ function ensureProjectHasEditableTrack(data) {
 
 export function getSentenceJsonData(filename, text, options = {}) {
     const inlineData = parseSentenceJsonSubtitle(text, true);
-    if (!inlineData?.some((row) => Array.isArray(row.sentences))) {
+    if (!inlineData?.some((row) => Array.isArray(row.sentences) || typeof row.text === "string")) {
         return null;
     }
 
@@ -891,6 +915,7 @@ export async function saveSrtFile(dirHandle, name, data, subdir = null) {
     if (!dirHandle) return false;
 
     try {
+        const text = combineToSRT(data);
         // 保存先ディレクトリの取得
         const targetDirHandle = subdir
             ? await dirHandle.getDirectoryHandle(subdir, { create: true })
@@ -903,7 +928,7 @@ export async function saveSrtFile(dirHandle, name, data, subdir = null) {
         // jsondata.name を name に置き換えたコピーを作成
         const nameWithoutExt = name;
 
-        await writable.write(combineToSRT(data));
+        await writable.write(text);
         await writable.close();
 
         console.log(`保存完了: ${subdir ? `${subdir}/` : ""}${name}`);
@@ -923,6 +948,7 @@ function serializeSentenceJsonSubtitle(data) {
             start: getPersistedTime(item, "start"),
             end: getPersistedTime(item, "end"),
             sentences,
+            ...copyClipBlockExtensions(item),
         };
     }), null, 2);
 }
@@ -1033,6 +1059,9 @@ function getPersistedTime(item, edge) {
 
 
 export function combineToSRT(data) {
+    if (data.some(hasClipBlockExtensions)) {
+        throw new TypeError("SRT cannot preserve subtitle block extensions; save as JSON");
+    }
     let srtText = "";
     let id = 1;
     for (const srtPart of data) {
@@ -1064,7 +1093,10 @@ export function getCurrentText(data, time) {
     }
     const entry = data[lo];
     if (entry && time >= entry.startTime && time <= entry.endTime) {
-        return { text: getSrtItemText(entry), entry, index: lo };
+        const primaryText = getSrtItemText(entry);
+        const text = primaryText.trim() ? primaryText
+            : getClipBlocks(entry).slice(1).map(({ body }) => getSrtItemText(body)).find((value) => value.trim()) ?? primaryText;
+        return { text, entry, index: lo };
     }
     return { text: "", entry: null, index: -1 }; // 一致なし
 }
@@ -1142,6 +1174,7 @@ function normalizeSrtItems(srtItems) {
 
     for (let i = 0; i < sorted.length; i++) {
         const curr = { ...sorted[i] };
+        validateClipBlocks(curr);
         const prev = normalized[normalized.length - 1];
 
         if (!prev) {
@@ -1187,6 +1220,8 @@ function normalizeSrtItems(srtItems) {
         // "　" 連続 → 結合処理
         if (
             prev &&
+            !hasClipBlockExtensions(prev) &&
+            !hasClipBlockExtensions(curr) &&
             isOnlyFullWidthSpace(prev.text) &&
             isOnlyFullWidthSpace(curr.text)
         ) {

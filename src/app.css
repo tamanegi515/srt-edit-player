@@ -5,8 +5,8 @@
   --bg: #242425;
   --panel-bg: var(--bg);
   --border-color: #414144;
-  --shadow-light: rgba(255, 255, 255, 0.045);
-  --shadow-dark: rgba(0, 0, 0, 0.28);
+  --shadow-light: rgba(255, 255, 255, 0.20);
+  --shadow-dark: rgba(0, 0, 0, 0.55);
   --accent: #2bb9bd;
   --text-color: #ddd;
   --text-muted: #aeb0b4;
@@ -14,7 +14,7 @@
   --back-color: var(--bg);
   --panel-radius: 8px;
   --panel-padding: 12px;
-  --panel-shadow: 4px 4px 9px var(--shadow-dark), -3px -3px 7px var(--shadow-light);
+  --panel-shadow: 5px 5px 10px var(--shadow-dark), -3px -3px 6px var(--shadow-light);
   --control-height: 32px;
   --control-height-compact: 28px;
   --control-radius: 4px;

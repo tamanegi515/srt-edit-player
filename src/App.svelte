@@ -11,6 +11,8 @@
     mediaState,
     projectState,
     removeEditorColumn,
+    selectEditorClip,
+    selectOverlayTrack,
     setLoadedMedia,
     setProjectDataList,
     uiState,
@@ -32,6 +34,9 @@
     syncJsonDataFromMedia,
   } from "./lib/data_process";
   import TrackView from "./components/Track_View.svelte";
+  import { getFileFromPath } from "./lib/util";
+  import { editClips, forkEditorHistory } from "./lib/editor_history";
+  import { splitSubtitleBlock } from "./lib/block_editing";
   import {
     hasUnsavedChanges, markProjectSaved, markTrackSaved, projectSnapshot,
     registerLoadedMedia, rememberMedia, resetProjectSessions, restoreMediaDraft, trackSnapshot,
@@ -59,6 +64,7 @@
   let loading = $state(false);
   let saving = $state(false);
   let creating = $state(false);
+  let convertingTrack = $state(false);
   let loadedProject = $state.raw(null);
   let preparedMedia = null;
 
@@ -378,6 +384,92 @@
     }
   }
 
+  async function splitIntoSubtitleBox({ track, data, blockId, before, after }) {
+    if (loading || saving || creating || loadedProject !== json_data) return;
+    if (!mediaState.media.srt_data.includes(track) || track.loadStatus !== "loaded") return;
+    flushEditor();
+    const index = track.data.indexOf(data);
+    if (index < 0) return;
+    const script = json_data.scriptFiles[track.id];
+    if (track.file_path.toLowerCase().endsWith(".json")) {
+      try {
+        let id;
+        editClips(track, [data], () => { id = splitSubtitleBlock(data, blockId, before, after, script); });
+        selectEditorClip(track.id, index, id);
+        selectOverlayTrack(track.id, null, index, id);
+        return { index, blockId: id };
+      } catch {
+        showToast("箱を分割できません。箱の数や字幕の構造を確認してください。", "error");
+        return;
+      }
+    }
+
+    creating = true;
+    convertingTrack = true;
+    let createdPath = null;
+    try {
+      const original = JSON.parse(trackSnapshot(track));
+      const candidate = JSON.parse(JSON.stringify(original));
+      const id = splitSubtitleBlock(candidate[index], blockId, before, after, script);
+      const base = track.file_path.replace(/\.srt$/i, "");
+      const referencedPaths = new Set(projectState.jsonDataList.flatMap((project) =>
+        (project.scriptFiles ?? []).map((item) => String(item.filePath ?? "").replace(/\\/g, "/").toLowerCase())));
+      let path;
+      for (let suffix = 1; suffix <= 100; suffix++) {
+        const proposed = `${base}.boxes${suffix === 1 ? "" : `-${suffix}`}.json`;
+        if (referencedPaths.has(proposed.replace(/\\/g, "/").toLowerCase())) continue;
+        try {
+          await getFileFromPath(projectState.dirHandle, proposed);
+        } catch (error) {
+          if (error.name !== "NotFoundError") throw error;
+          path = proposed;
+          break;
+        }
+      }
+      if (!path || !await createSubtitleFile(projectState.dirHandle, path, candidate)) {
+        throw new Error("Subtitle JSON creation failed");
+      }
+      createdPath = path;
+      const payload = JSON.parse(JSON.stringify(syncJsonDataFromMedia(json_data, mediaState.media)));
+      payload.scriptFiles[track.id].filePath = path;
+      payload.scriptFiles[track.id].name = path;
+      const vcName = `${mediaState.media.name.replace(/\.[^/.]+$/, "")}.vc_json`;
+      if (!await saveJsonFile(projectState.dirHandle, vcName, payload)) throw new Error("Project reference save failed");
+
+      // Detach this JSON source from other projects that still reference the original SRT.
+      const sourceData = track.data;
+      track.data = original;
+      forkEditorHistory(sourceData, track.data, (value) => {
+        let reactiveClip = $state(value);
+        return reactiveClip;
+      });
+      track.file_path = path;
+      track.name = path;
+      script.filePath = path;
+      script.name = path;
+      editClips(track, [track.data[index]], () => {
+        const target = track.data[index];
+        for (const key of ["text", "sentences", "layout", "additionalBlocks"]) {
+          if (candidate[index][key] === undefined) delete target[key];
+          else target[key] = candidate[index][key];
+        }
+      });
+      markTrackSaved(json_data, track, trackSnapshot(track));
+      markProjectSaved(json_data, projectSnapshot(json_data));
+      createdPath = null;
+      selectEditorClip(track.id, index, id);
+      selectOverlayTrack(track.id, null, index, id);
+      showToast(`元SRTを残し、${path} に保存しました。`);
+      return { index, blockId: id };
+    } catch {
+      if (createdPath) await removeCreatedSubtitleFile(projectState.dirHandle, createdPath);
+      showToast("箱を分割できませんでした。元の字幕と参照先を維持します。", "error");
+    } finally {
+      creating = false;
+      convertingTrack = false;
+    }
+  }
+
   onMount(() => {
     const preventDiscard = (event) => {
       flushEditor();
@@ -394,7 +486,7 @@
 </script>
 
 <svelte:window onmousedown={clearOverlaySelectionOutsideRibbon} />
-<main inert={loading}>
+<main inert={loading || convertingTrack}>
   <header class="app-toolbar">
     <div class="folder-path">{projectState.folderName}</div>
 
@@ -557,7 +649,7 @@
                 <div class="resize-bar" class:dragging={dragging && currentColumnIndex === index} role="separator" aria-orientation="vertical" aria-valuemin="50" aria-valuemax="10000" aria-valuenow={Math.round(column.width)} tabindex="0" aria-label="列幅の調整" onkeydown={(event) => resizeWithKeyboard(event, index)} onmousedown={(event) => startDrag(event, index)}></div>
               {/if}
               <div class="editor-column-body">
-                <SrtEditor bind:this={useRefs.editorRefs[index]} column={column} />
+                <SrtEditor bind:this={useRefs.editorRefs[index]} column={column} onsplitbox={splitIntoSubtitleBox} />
               </div>
             </div>
           {/each}
