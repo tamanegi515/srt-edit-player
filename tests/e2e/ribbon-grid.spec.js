@@ -51,6 +51,14 @@ async function geometry(page) {
       widths: bounds.map(box => box.width),
       gaps: bounds.slice(1).map((box, index) => box.left - bounds[index].right),
       titleTops: panels.map(panel => panel.querySelector(".area-title").getBoundingClientRect().top),
+      headingSpacing: panels.map(panel => {
+        const title = panel.querySelector(".area-title");
+        const style = getComputedStyle(title);
+        return {
+          belowText: parseFloat(style.paddingBottom),
+          belowDivider: panel.querySelector(".ribbon-row").getBoundingClientRect().top - title.getBoundingClientRect().bottom,
+        };
+      }),
       rowTops: panels.map(panel => [...panel.querySelectorAll(".ribbon-row")].map(row => row.getBoundingClientRect().top)),
       failures,
     };
@@ -66,11 +74,12 @@ for (const width of [1920, 1366, 768, 390]) {
       "- position -", "- style -", "- font -", "- outline -", "- shadow -",
     ]);
     const metrics = await geometry(page);
-    expect(metrics.height).toBeLessThanOrEqual(145);
+    expect(metrics.height).toBe(137);
     expect(metrics.verticalOverflow).toBe(0);
     expect(metrics.widths).toEqual([300, 260, 304, 362, 368]);
     expect(metrics.gaps).toEqual([14, 14, 14, 14]);
     expect(new Set(metrics.titleTops).size).toBe(1);
+    expect(metrics.headingSpacing).toEqual(Array.from({ length: 5 }, () => ({ belowText: 5, belowDivider: 6 })));
     expect(new Set(metrics.rowTops.map(rows => rows[0])).size).toBe(1);
     expect(metrics.rowTops.map(rows => rows.length)).toEqual([3, 2, 2, 2, 3]);
     for (const rows of metrics.rowTops) {

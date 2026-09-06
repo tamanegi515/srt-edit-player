@@ -6,7 +6,7 @@
   --panel-bg: var(--bg);
   --border-color: #414144;
   --shadow-light: rgba(255, 255, 255, 0.10);
-  --shadow-dark: rgba(0, 0, 0, 0.55);
+  --shadow-dark: rgba(0, 0, 0, 0.36);
   --accent: #2bb9bd;
   --text-color: #ddd;
   --text-muted: #aeb0b4;
@@ -34,7 +34,7 @@
   --control-bg: var(--bg);
   --control-border: transparent;
   --control-face: none;
-  --control-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4), -2px -2px 4px rgba(255, 255, 255, 0.075);
+  --control-shadow: 2px 2px 4px rgba(0, 0, 0, 0.28), -2px -2px 4px rgba(255, 255, 255, 0.075);
 }
 
 html,

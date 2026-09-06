@@ -374,9 +374,9 @@
     }
     .ribbon-area {
         display: grid;
-        grid-template-rows: 18px repeat(3, 28px);
+        grid-template-rows: 24px repeat(3, 28px);
         row-gap: 4px;
-        padding: 6px 10px 8px 12px;
+        padding: 4px 10px 4px 12px;
         min-width: 0;
         box-sizing: border-box;
         border: 1px solid transparent;
@@ -389,9 +389,10 @@
     }
     .area-title {
         margin: 0;
-        height: 18px;
+        height: 22px;
         box-sizing: border-box;
-        line-height: 17px;
+        padding-bottom: 5px;
+        line-height: 16px;
         text-align: center;
         font-size: 13px;
         color: #28b7b7;

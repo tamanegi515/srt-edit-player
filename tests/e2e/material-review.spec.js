@@ -33,8 +33,8 @@ for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 12
       await expect(panel).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
       const inRibbon = await panel.evaluate((el) => el.classList.contains("ribbon-area"));
       await expect(panel).toHaveCSS("box-shadow", inRibbon
-        ? "rgba(0, 0, 0, 0.55) 3px 3px 6px 0px, rgba(255, 255, 255, 0.1) -2px -2px 5px 0px"
-        : "rgba(0, 0, 0, 0.55) 5px 5px 10px 0px, rgba(255, 255, 255, 0.1) -4px -4px 8px 0px");
+        ? "rgba(0, 0, 0, 0.36) 3px 3px 6px 0px, rgba(255, 255, 255, 0.1) -2px -2px 5px 0px"
+        : "rgba(0, 0, 0, 0.36) 5px 5px 10px 0px, rgba(255, 255, 255, 0.1) -4px -4px 8px 0px");
     }
     const gaps = await page.locator(".ribbon-area").evaluateAll((panels) => {
       const bounds = panels.map((panel) => panel.getBoundingClientRect());
@@ -46,7 +46,7 @@ for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 12
       if (await button.isDisabled()) {
         await expect(button).toHaveCSS("box-shadow", "none");
       } else if (await button.evaluate((el) => !!el.closest(".surface-controls"))) {
-        await expect(button).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.4) 2px 2px 4px 0px, rgba(255, 255, 255, 0.075) -2px -2px 4px 0px");
+        await expect(button).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.28) 2px 2px 4px 0px, rgba(255, 255, 255, 0.075) -2px -2px 4px 0px");
         await expect(button).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
       } else {
         await expect(button).toHaveCSS("box-shadow", "rgba(255, 255, 255, 0.09) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.28) 0px 1px 2px 0px");
