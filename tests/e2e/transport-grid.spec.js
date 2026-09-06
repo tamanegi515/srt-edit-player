@@ -31,25 +31,35 @@ for (const width of [220, 500, 800]) {
     await expect.poll(async () => (await player.boundingBox()).width).toBe(width);
     const controls = player.locator(".media-controls");
     await expectContainedControls(controls);
-    const labels = player.locator(".control-row > label");
-    const groups = await labels.evaluateAll(nodes => nodes.map(node => {
-      const rect = node.getBoundingClientRect();
-      const children = [...node.children].map(child => {
-        const childRect = child.getBoundingClientRect();
-        return { x: childRect.x - rect.x, center: childRect.y + childRect.height / 2 - rect.y };
-      });
-      return { height: rect.height, children };
-    }));
-    expect(groups).toHaveLength(2);
-    expect(groups[0]).toEqual(groups[1]);
-    expect(groups[0].height).toBe(32);
-    for (const child of groups[0].children) expect(child.center).toBe(16);
-    if (width === 800) expect((await player.locator(".control-row").boundingBox()).height).toBe(32);
-    const volume = player.locator(".control-row > label input[type=range]").first();
+    const play = await page.getByTestId("toggle-playback").boundingBox();
+    const seek = await player.getByRole("slider", { name: "再生位置", exact: true }).boundingBox();
+    expect(seek.y + seek.height / 2).toBe(play.y + play.height / 2);
+    expect(seek.x).toBeGreaterThanOrEqual(play.x + play.width + 5);
+    expect(seek.width).toBeGreaterThanOrEqual(24);
+    if (width === 800) {
+      expect((await player.locator(".control-row").boundingBox()).height).toBe(32);
+      expect((await controls.boundingBox()).height).toBeLessThanOrEqual(60);
+    }
+    const volume = player.getByRole("slider", { name: "音量", exact: true });
+    expect((await volume.boundingBox()).width).toBeLessThanOrEqual(80);
     await volume.fill("0.5");
     await volume.press("ArrowRight");
     await expect(volume).toHaveValue("0.51");
     await expect(player.locator(".control-value").first()).toHaveText("0.51");
+    const rateTrigger = player.getByRole("button", { name: "倍速を調整", exact: true });
+    await expect(rateTrigger).toHaveAttribute("aria-expanded", "false");
+    await rateTrigger.click();
+    const rate = player.getByRole("slider", { name: "倍速", exact: true });
+    await expect(rate).toBeVisible();
+    expect((await rate.boundingBox()).width).toBeLessThanOrEqual(80);
+    await expectContainedControls(controls);
+    await rate.fill("1");
+    await rate.press("ArrowRight");
+    await expect(rate).toHaveValue("1.05");
+    await expect(player.locator(".rate-options .control-value")).toHaveText("1.05");
+    await rate.press("Escape");
+    await expect(rateTrigger).toBeFocused();
+    await expect(rate).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath(`player-${width}.png`) });
   });
 }
@@ -76,4 +86,31 @@ test("timeline controls share 32px rows and only wrap when necessary", async ({ 
   await controls.locator(".auto-scroll-control").click();
   expect(await auto.isChecked()).toBe(!checked);
   await page.screenshot({ path: testInfo.outputPath("timeline-wrapped.png") });
+});
+
+test("rate expansion supports hover, keyboard and click without covering the preview", async ({ page }) => {
+  await page.goto("/");
+  const trigger = page.getByRole("button", { name: "倍速を調整", exact: true });
+  const rate = page.getByRole("slider", { name: "倍速", exact: true });
+  await expect(rate).toHaveCount(0);
+  await trigger.hover();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await rate.hover();
+  await expect(rate).toBeVisible();
+  const stage = await page.locator(".media-stage").boundingBox();
+  expect((await rate.boundingBox()).y).toBeGreaterThanOrEqual(stage.y + stage.height);
+  await page.mouse.move(1, 1);
+  await expect(rate).toHaveCount(0);
+  await trigger.focus();
+  await page.keyboard.press("Tab");
+  await expect(rate).toBeFocused();
+  await rate.press("ArrowRight");
+  await expect(rate).toHaveValue("1.05");
+  await rate.press("Escape");
+  await expect(trigger).toBeFocused();
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  await trigger.press("Enter");
+  await expect(rate).toBeVisible();
+  await page.locator("div.folder-path").click();
+  await expect(rate).toHaveCount(0);
 });

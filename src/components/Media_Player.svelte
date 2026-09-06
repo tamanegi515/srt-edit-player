@@ -1,61 +1,12 @@
 <script>
-    import { onMount, onDestroy, untrack } from "svelte";
+    import { onMount } from "svelte";
     import ViewContainer from "./View_Container.svelte";
-    import { getFileFromPath } from "../lib/util";
     import CustomSlider from "./Custom_Slider.svelte";
-    import { mediaState, projectState, uiState, useAudio } from "../lib/store.svelte";
-    import { getCurrentText } from "../lib/data_process";
+    import PlaybackRateControl from "./Playback_Rate_Control.svelte";
+    import { mediaState, projectState, useAudio } from "../lib/store.svelte";
 
 
     let json_data = $derived(projectState.jsonDataList[projectState.mediaIndex]);
-    // 画像srtトラック（常に srt_data の最後に入る）
-    let imageTrack = $derived(mediaState.media.srt_data.find(t => t.isImageTrack));
-
-    let imageRequestToken = 0;
-    let pendingImage = $state.raw(null);
-    const imageNavigationIndex = $derived(pendingImage?.target === mediaState.media.image_data
-        ? pendingImage.index : mediaState.media.image_data.currentId);
-    const autoImage = $derived(imageTrack ? getCurrentText(imageTrack.data, json_data.seekTime) : null);
-    const autoImagePath = $derived(autoImage?.text ?? "");
-    const autoImageIndex = $derived(autoImage?.index ?? -1);
-
-    async function loadImage(targetImageData, dirHandle, path, index, token) {
-        pendingImage = { target: targetImageData, index };
-        try {
-            const imageFile = await getFileFromPath(dirHandle, path.replace(/\\/g, "/"));
-            if (!imageFile || token !== imageRequestToken || mediaState.media.image_data !== targetImageData) return;
-            const imageURL = URL.createObjectURL(imageFile);
-            const oldUrl = targetImageData.currentImage;
-            targetImageData.currentImage = imageURL;
-            targetImageData.currentImagePath = path;
-            targetImageData.currentId = index;
-            if (oldUrl?.startsWith("blob:")) URL.revokeObjectURL(oldUrl);
-        } catch {
-            console.warn("画像切り替えをスキップしました");
-        } finally {
-            if (token === imageRequestToken) pendingImage = null;
-        }
-    }
-
-    // Track the requested entry, not every playback frame or the eventual image write.
-    $effect(() => {
-        const enabled = uiState.imageAuto;
-        const path = enabled ? autoImagePath : "";
-        const index = enabled ? autoImageIndex : -1;
-        const targetImageData = mediaState.media.image_data;
-        const dirHandle = projectState.dirHandle;
-        untrack(() => {
-            const token = ++imageRequestToken;
-            pendingImage = null;
-            if (!enabled || !path) return;
-            if (path === targetImageData.currentImagePath && targetImageData.currentImage) {
-                targetImageData.currentId = index;
-                return;
-            }
-            void loadImage(targetImageData, dirHandle, path, index, token);
-        });
-    });
-    onDestroy(() => { imageRequestToken++; });
 
     function togglePlayback() {
         if (mediaState.media.isPlaying) {
@@ -74,15 +25,6 @@
         // シークバーの max と同じ「duration と現在の seekTime の大きい方」を上限にする。
         const ceiling = Math.max(mediaState.media.duration || 0, json_data.seekTime || 0);
         useAudio.seek(Math.max(0, Math.min(ceiling, json_data.seekTime + sec)));
-    }
-    async function changeIMG(id) {
-        if (!imageTrack) return;
-        const data = imageTrack.data;
-        // await 中にメディアが切り替わった場合に備え、対象の image_data を先に捕捉しておく
-        const targetImageData = mediaState.media.image_data;
-        const nextId = imageNavigationIndex + id;
-        if (nextId < 0 || nextId >= data.length) return;
-        await loadImage(targetImageData, projectState.dirHandle, data[nextId].text, nextId, ++imageRequestToken);
     }
     // タイム表示
     function formatTime(seconds) {
@@ -164,7 +106,15 @@
     </div>
 
     <div class="media-controls">
-        <div class="bar-container">
+        <div class="control-row">
+            <button class="nmorph_button" data-testid="toggle-playback" aria-label={mediaState.media.isPlaying ? "一時停止" : "再生"} onclick={togglePlayback}>
+                {#if mediaState.media.isPlaying}
+                    <span class="material-symbols-outlined"> pause </span>
+                {:else}
+                    <span class="material-symbols-outlined"> play_arrow </span>
+                {/if}
+            </button>
+            <div class="bar-container">
             <CustomSlider
                 variant="seek"
                 aria-label="再生位置"
@@ -180,46 +130,17 @@
             <p class="setRight">
                 {formatTime(json_data.seekTime)} / {formatTime(mediaState.media.duration)}
             </p>
+            </div>
+            <label class="volume-control" title="音量">
+                <span class="material-symbols-outlined" aria-hidden="true">volume_up</span>
+                <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
+                <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
+            </label>
+            <PlaybackRateControl />
         </div>
         {#if !mediaState.media.isAudio}
             <div class="no-audio-note">音声ファイルがありません（字幕の時間のみ表示）</div>
         {/if}
-
-        <div class="control-row">
-            <button class="nmorph_button" onclick={togglePlayback}>
-                {#if mediaState.media.isPlaying}
-                    <span class="material-symbols-outlined"> pause </span>
-                {:else}
-                    <span class="material-symbols-outlined"> play_arrow </span>
-                {/if}
-            </button>
-
-            <label>
-                <span>音量：</span>
-                <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
-                <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
-            </label>
-
-            <label>
-                <span>倍速：</span>
-                <CustomSlider min="0.5" max="3.0" step="0.05" aria-label="倍速" value={mediaState.media.playbackRate} oninput={(event) => useAudio.setRate(event.currentTarget.valueAsNumber)}></CustomSlider>
-                <span class="control-value">{mediaState.media.playbackRate.toFixed(2)}</span>
-            </label>
-
-            <div class="image-control-group">
-                <button class="nmorph_button"
-                    disabled={imageNavigationIndex <= 0}
-                    onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
-                <span>画像</span>
-                <button class="nmorph_button"
-                    disabled={imageNavigationIndex >= (imageTrack?.data.length ?? 1) - 1}
-                    onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
-                <label class="toggle_switch" title="画像自動切り替え">
-                    <input type="checkbox" bind:checked={uiState.imageAuto} style="visibility: hidden;" />
-                    <span class="toggle-slider"></span>
-                </label>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -238,6 +159,8 @@
         height: 100%;
         min-height: 0;
         gap: 6px;
+        container-type: inline-size;
+        container-name: media-player;
     }
     .media-stage {
         flex: 1 1 auto;
@@ -272,43 +195,53 @@
         flex: 0 0 auto;
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 2px;
         margin: 0 5px 5px; /* media-stage の padding: 5px と左右端を揃える */
-        padding: 8px 12px 10px;
+        padding: 4px 6px;
         border: 1px solid transparent;
         border-radius: 8px;
         background: var(--panel-bg);
         box-shadow: var(--panel-shadow);
     }
     .control-row {
-        display: flex;
+        display: grid;
+        grid-template-columns: 32px minmax(100px, 1fr) max-content max-content;
         align-items: center;
         gap: 8px;
         min-height: var(--control-size);
-        flex-wrap: wrap;
     }
-    .control-row label:not(.toggle_switch),
-    .image-control-group {
+    .volume-control {
         display: grid;
+        grid-template-columns: 24px 72px 36px;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         height: var(--control-size);
         white-space: nowrap;
     }
-    .control-row > label {
-        grid-template-columns: max-content minmax(0, 1fr) 40px;
-        flex: 0 1 225px;
-        min-width: 0;
-        max-width: 100%;
-    }
-    .control-row > label :global(input[type="range"]) {
+    .volume-control :global(input[type="range"]) {
         width: 100%;
         min-width: 0;
     }
-    .image-control-group {
-        grid-template-columns: var(--control-size) max-content var(--control-size) 30px;
-        flex: 0 0 auto;
-        min-width: 0;
+    @container media-player (max-width: 650px) {
+        .control-row {
+            grid-template-columns: 32px minmax(0, 1fr);
+            gap: 4px 6px;
+        }
+        .control-row :global(.playback-rate-control) {
+            grid-column: 1 / -1;
+            justify-self: end;
+            grid-row: 2;
+        }
+        .volume-control {
+            grid-column: 1 / -1;
+            grid-row: 2;
+            justify-self: start;
+        }
+    }
+    @container media-player (max-width: 369px) {
+        .control-row :global(.playback-rate-control) {
+            grid-row: 3;
+        }
     }
     .control-value {
         text-align: right;
@@ -343,8 +276,9 @@
         display: grid;
         grid-template-columns: minmax(0, 1fr) max-content;
         align-items: center;
-        gap: 8px;
+        gap: 6px;
         width: 100%;
+        min-width: 0;
         height: var(--control-size);
     }
 
@@ -352,7 +286,8 @@
         color: #8a8a8a;
         font-size: 12px;
         text-align: center;
-        margin: 2px 0;
+        margin: 0;
+        line-height: 16px;
     }
 
     .playBtn {

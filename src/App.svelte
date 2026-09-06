@@ -34,6 +34,7 @@
     syncJsonDataFromMedia,
   } from "./lib/data_process";
   import TrackView from "./components/Track_View.svelte";
+  import WorkspaceControls from "./components/Workspace_Controls.svelte";
   import { getFileFromPath } from "./lib/util";
   import { editClips, forkEditorHistory } from "./lib/editor_history";
   import { splitSubtitleBlock } from "./lib/block_editing";
@@ -45,6 +46,7 @@
   let dragging = $state(false);
   let startX = $state(0);
   let startWidth = $state();
+  let trackView = $state.raw(null);
 
   // トースト通知
   let toastMessage = $state('');
@@ -656,9 +658,12 @@
       </div>
     </section>
 
-    {#if uiState.viewTrack}
-      <TrackView></TrackView>
-    {/if}
+    <div class="track-shell" bind:this={useRefs.trackRef}>
+      <WorkspaceControls onscrolltimeline={() => trackView?.scrollTimeLine()} />
+      {#if uiState.viewTrack}
+        <TrackView bind:this={trackView} />
+      {/if}
+    </div>
   {/if}
 </main>
 
@@ -671,6 +676,14 @@
     display: flex;
     flex-direction: column;
     gap: 6px;
+  }
+
+  .track-shell {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex-shrink: 0;
+    gap: 4px;
   }
 
   /* ── 上部ツールバー（折り返し対応・グループ化） ── */

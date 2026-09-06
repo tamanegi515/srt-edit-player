@@ -117,6 +117,7 @@ for (const control of [
 ]) {
   test(`${control.property} uses the final input value for click, drag, keyboard and wheel`, async ({ page }) => {
     await loadControlsFixture(page);
+    if (control.property === "playbackRate") await page.getByRole("button", { name: "倍速を調整", exact: true }).click();
     const slider = page.getByRole("slider", { name: control.label, exact: true });
     await slider.fill(control.value);
     await expectAudioMatches(page, slider, control.property);
@@ -160,10 +161,10 @@ test("the generated WAV really plays and stage wheel seeks it", async ({ page })
   await loadControlsFixture(page);
   const seek = page.getByRole("slider", { name: "再生位置", exact: true });
   await seek.fill("2");
-  await page.locator(".control-row > button").click();
+  await page.getByTestId("toggle-playback").click();
   await expect.poll(() => audioValue(page, "paused")).toBe(false);
   await expect.poll(() => audioValue(page, "currentTime")).toBeGreaterThan(2.05);
-  await page.locator(".control-row > button").click();
+  await page.getByTestId("toggle-playback").click();
   await expect.poll(() => audioValue(page, "paused")).toBe(true);
   await seek.fill("4");
   await page.locator(".media-stage").hover();
@@ -410,7 +411,9 @@ test("short previews keep the full empty-state text and narrow player controls f
   await page.screenshot({ path: testInfo.outputPath("controls-short-preview.png"), fullPage: true });
   await page.setViewportSize({ width: 752, height: 1000 });
   await page.locator(".media-player").evaluate(element => { element.style.width = "200px"; });
-  const violations = await page.locator(".control-row > label").evaluateAll(labels => labels.flatMap(label => {
+  const labels = page.locator(".volume-control");
+  await expect(labels).toHaveCount(1);
+  const violations = await labels.evaluateAll(labels => labels.flatMap(label => {
     const bounds = label.getBoundingClientRect();
     const panel = label.closest(".media-controls").getBoundingClientRect();
     return [
@@ -428,6 +431,8 @@ test("overflowing empty media scrolls without seeking but normal stage wheel sti
   await loadControlsFixture(page, { noImage: true, noAudio: true, tracks: 3 });
   const placeholder = page.locator(".media-placeholder");
   const seek = page.getByRole("slider", { name: "再生位置", exact: true });
+  // Keep this an actual overflow scenario even when compact controls free more preview space.
+  await page.locator(".media-stage").evaluate(element => { element.style.flex = "0 0 60px"; });
   await expect.poll(() => placeholder.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(0);
   await placeholder.hover();
   await page.mouse.wheel(0, 100);
@@ -443,6 +448,7 @@ test("overflowing empty media scrolls without seeking but normal stage wheel sti
   await page.locator(".media-stage").hover({ position: { x: 2, y: 2 } });
   await page.mouse.wheel(0, 100);
   await expect(seek).toHaveValue("1");
+  await page.locator(".media-stage").evaluate(element => { element.style.removeProperty("flex"); });
   await page.setViewportSize({ width: 1000, height: 1000 });
   await expect.poll(() => placeholder.evaluate(element => element.scrollHeight - element.clientHeight)).toBe(0);
   await placeholder.hover({ position: { x: 8, y: 8 } });

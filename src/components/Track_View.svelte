@@ -1,8 +1,7 @@
 <script>
     import { onMount, onDestroy } from "svelte";
     import Track from "./Track.svelte";
-    import CustomSlider from "./Custom_Slider.svelte";
-    import { mediaState, projectState, uiState, useAudio, useRefs } from "../lib/store.svelte";
+    import { mediaState, projectState, uiState, useAudio } from "../lib/store.svelte";
     import { convSecToStr } from "../lib/util";
 
     // let tracks = $state(getSampleTracks());
@@ -73,7 +72,7 @@
         // console.log(offsetX);
     }
     // 手動「Scroll」ボタン用: 再生位置を強制的に中央へ
-    function scrollTimeLine() {
+    export function scrollTimeLine() {
         if (!timeLineRef) return;
         const currentX = projectState.jsonDataList[projectState.mediaIndex].seekTime * 1000 * pixel_per_msec;
         timeLineRef.scrollLeft = currentX - timeLineRef.clientWidth / 2;
@@ -163,23 +162,6 @@
     });
 </script>
 
-<div class="track-shell" bind:this = {useRefs.trackRef}>
-    <div class="track-controls surface-controls">
-        <label class="zoom-control">
-            <span>拡大率：</span>
-            <CustomSlider aria-label="タイムライン拡大率" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
-        </label>
-        <label class="auto-scroll-control">
-            <span>AutoScroll：</span>
-            <span class="toggle_switch">
-                <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
-                <span class="toggle-slider"></span>
-            </span>
-        </label>
-        <button class="nmorph_button" onclick={scrollTimeLine}>
-            <span class="material-symbols-outlined">skip_next</span>
-        </button>
-    </div>
     <div class="track-view" style="grid-template-columns: {leftWidth}px  5px 1fr;grid-template-rows:1fr;">
         <div class="left-panel" style="display: grid;grid-template-columns: 1fr;grid-template-rows:35px {gridRowStyle};">
             <div>tracks</div>
@@ -219,50 +201,9 @@
             <div class="playhead" style="transform: translateX({playheadX}px);"></div>
         </div>
     </div>
-</div>
 
 <style>
 /* テーマトークンは app.css の :root に集約 */
-
-.track-shell {
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
-    flex-shrink: 0; /* ワークスペースが縮む時にタイムラインの行が無言で潰れないようにする */
-    gap: 4px;
-}
-
-.track-controls {
-    --control-size: var(--control-height, 32px);
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    min-height: var(--control-size);
-    min-width: 0;
-    gap: 8px;
-    white-space: nowrap;
-    color: #c4ced0;
-}
-
-.zoom-control,
-.auto-scroll-control {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr);
-    align-items: center;
-    gap: 8px;
-    height: var(--control-size);
-    min-width: 0;
-    max-width: 100%;
-}
-
-.zoom-control :global(input[type="range"]) {
-    max-width: 100%;
-}
-
-.auto-scroll-control {
-    grid-template-columns: max-content 30px;
-    flex: 0 0 auto;
-}
 
 /* トラックビュー全体 */
 .track-view {
