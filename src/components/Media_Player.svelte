@@ -115,6 +115,11 @@
                 {/if}
             </button>
             <PlaybackRateControl />
+            <label class="volume-control" title="音量">
+                <span class="material-symbols-outlined" aria-hidden="true">volume_up</span>
+                <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
+                <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
+            </label>
             <div class="bar-container">
             <CustomSlider
                 variant="seek"
@@ -132,11 +137,6 @@
                 {formatTime(json_data.seekTime)} / {formatTime(mediaState.media.duration)}
             </p>
             </div>
-            <label class="volume-control" title="音量">
-                <span class="material-symbols-outlined" aria-hidden="true">volume_up</span>
-                <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
-                <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
-            </label>
         </div>
         {#if !mediaState.media.isAudio}
             <div class="no-audio-note">音声ファイルがありません（字幕の時間のみ表示）</div>
@@ -205,7 +205,7 @@
     }
     .control-row {
         display: grid;
-        grid-template-columns: 32px 32px minmax(100px, 1fr) max-content;
+        grid-template-columns: 32px 32px max-content minmax(100px, 1fr);
         align-items: center;
         gap: 8px;
         min-height: var(--control-size);

@@ -47,6 +47,12 @@ for (const width of [220, 500, 800]) {
         expect(trigger.x - play.x - play.width).toBeLessThanOrEqual(8);
         expect(seek.x).toBeGreaterThan(play.x + play.width);
         expect((await page.getByRole("slider", { name: "音量", exact: true }).boundingBox()).width).toBe(72);
+        if (width >= 800) {
+            const volume = await page.locator(".volume-control").boundingBox();
+            expect(volume.y).toBe(play.y);
+            expect(volume.x).toBe(trigger.x + trigger.width + 8);
+            expect(seek.x).toBe(volume.x + volume.width + 8);
+        }
         const collapsed = await controls.boundingBox();
         if (width >= 800) expect(collapsed.height).toBeLessThanOrEqual(48);
         await page.getByRole("button", { name: "倍速を調整" }).click();
