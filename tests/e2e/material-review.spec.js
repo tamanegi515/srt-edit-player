@@ -31,7 +31,7 @@ for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 76
     await expect.poll(() => panels.count()).toBeGreaterThanOrEqual(7);
     for (const panel of await panels.all()) {
       await expect(panel).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
-      await expect(panel).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 5px 5px 10px 0px, rgba(255, 255, 255, 0.2) -3px -3px 6px 0px");
+      await expect(panel).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 5px 5px 10px 0px, rgba(255, 255, 255, 0.1) -4px -4px 8px 0px");
     }
     for (const button of await page.locator(".nmorph_button, .CheckButtonArea label").all()) {
       await expect(button).toHaveCSS("box-shadow", "none");
