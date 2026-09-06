@@ -19,7 +19,7 @@ test("short color popup scrolls without overlapping the eyedropper", async ({ pa
   }
 });
 
-for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
+for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 1209 }, { width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
   test(`panel relief and flat controls at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const errors = [];
@@ -31,8 +31,17 @@ for (const viewport of [{ width: 1426, height: 1209 }, { width: 1366, height: 76
     await expect.poll(() => panels.count()).toBeGreaterThanOrEqual(7);
     for (const panel of await panels.all()) {
       await expect(panel).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
-      await expect(panel).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.55) 5px 5px 10px 0px, rgba(255, 255, 255, 0.1) -4px -4px 8px 0px");
+      const inRibbon = await panel.evaluate((el) => el.classList.contains("ribbon-area"));
+      await expect(panel).toHaveCSS("box-shadow", inRibbon
+        ? "rgba(0, 0, 0, 0.55) 3px 3px 6px 0px, rgba(255, 255, 255, 0.1) -2px -2px 5px 0px"
+        : "rgba(0, 0, 0, 0.55) 5px 5px 10px 0px, rgba(255, 255, 255, 0.1) -4px -4px 8px 0px");
     }
+    const gaps = await page.locator(".ribbon-area").evaluateAll((panels) => {
+      const bounds = panels.map((panel) => panel.getBoundingClientRect());
+      return bounds.slice(1).map((rect, index) => rect.left - bounds[index].right);
+    });
+    expect(gaps).toHaveLength(4);
+    for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(14);
     for (const button of await page.locator(".nmorph_button, .CheckButtonArea label").all()) {
       await expect(button).toHaveCSS("box-shadow", "none");
     }

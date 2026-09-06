@@ -404,6 +404,7 @@
     }
     .ribbonview {
         --control-size: var(--control-height-compact);
+        --panel-shadow: 3px 3px 6px var(--shadow-dark), -2px -2px 5px var(--shadow-light);
         /* main の縦 flex 配分で潰されない（ワークスペースの内容が大きい時に
            リボンだけが比例縮小されて数pxの帯になる事故を防ぐ）。
            高さは固定せず内容に合わせる（固定高だとパネル下端が切れる） */
@@ -426,6 +427,9 @@
     .ribbonview tr {
         display: flex;
         align-items: stretch;
+    }
+    .ribbonview tr {
+        column-gap: 8px;
     }
     .ribbonview td {
         vertical-align: top;
