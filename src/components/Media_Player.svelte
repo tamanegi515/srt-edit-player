@@ -195,13 +195,13 @@
             </button>
 
             <label>
-                音量：
+                <span>音量：</span>
                 <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
                 <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
             </label>
 
             <label>
-                倍速：
+                <span>倍速：</span>
                 <CustomSlider min="0.5" max="3.0" step="0.05" aria-label="倍速" value={mediaState.media.playbackRate} oninput={(event) => useAudio.setRate(event.currentTarget.valueAsNumber)}></CustomSlider>
                 <span class="control-value">{mediaState.media.playbackRate.toFixed(2)}</span>
             </label>
@@ -210,7 +210,7 @@
                 <button class="nmorph_button"
                     disabled={imageNavigationIndex <= 0}
                     onclick={() => changeIMG(-1)}><span class="material-symbols-outlined"> keyboard_double_arrow_left </span></button>
-                画像
+                <span>画像</span>
                 <button class="nmorph_button"
                     disabled={imageNavigationIndex >= (imageTrack?.data.length ?? 1) - 1}
                     onclick={() => changeIMG(1)}><span class="material-symbols-outlined"> keyboard_double_arrow_right </span></button>
@@ -268,6 +268,7 @@
         }
     }
     .media-controls {
+        --control-size: var(--control-height, 32px);
         flex: 0 0 auto;
         display: flex;
         flex-direction: column;
@@ -283,37 +284,33 @@
         display: flex;
         align-items: center;
         gap: 8px;
-        min-height: 34px;
+        min-height: var(--control-size);
         flex-wrap: wrap;
     }
     .control-row label:not(.toggle_switch),
     .image-control-group {
-        display: inline-flex;
+        display: grid;
         align-items: center;
-        gap: 6px;
-        min-height: 30px;
+        gap: 8px;
+        height: var(--control-size);
         white-space: nowrap;
     }
     .control-row > label {
+        grid-template-columns: max-content minmax(0, 1fr) 40px;
         flex: 0 1 225px;
         min-width: 0;
         max-width: 100%;
     }
     .control-row > label :global(input[type="range"]) {
-        flex: 1 1 129px;
-        width: 0;
-        min-width: 24px;
-    }
-    .image-control-group {
-        flex: 0 1 auto;
-        flex-wrap: wrap;
+        width: 100%;
         min-width: 0;
     }
-    .image-control-group .toggle_switch {
+    .image-control-group {
+        grid-template-columns: var(--control-size) max-content var(--control-size) 30px;
         flex: 0 0 auto;
+        min-width: 0;
     }
     .control-value {
-        flex: 0 0 40px;
         text-align: right;
         font-variant-numeric: tabular-nums;
     }
@@ -337,18 +334,18 @@
 
     .setRight {
         white-space: nowrap;
-        flex: 0 0 110px;
         text-align: right; /* 右揃えに設定 */
         margin: 0;
         font-variant-numeric: tabular-nums;
     }
 
     .bar-container {
-        display: flex;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) max-content;
         align-items: center;
-        gap: 6px;
+        gap: 8px;
         width: 100%;
-        height: var(--control-height);
+        height: var(--control-size);
     }
 
     .no-audio-note {

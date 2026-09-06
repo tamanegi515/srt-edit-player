@@ -164,12 +164,17 @@
 </script>
 
 <div class="track-shell" bind:this = {useRefs.trackRef}>
-    <div class="track-controls">
-        拡大率：<CustomSlider aria-label="タイムライン拡大率" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
-        AutoScroll：
-        <label class="toggle_switch">
-            <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
-            <span class="toggle-slider"></span>
+    <div class="track-controls surface-controls">
+        <label class="zoom-control">
+            <span>拡大率：</span>
+            <CustomSlider aria-label="タイムライン拡大率" min="0.5" max="20" step="0.1" bind:value={uiState.timeLineRatio} />
+        </label>
+        <label class="auto-scroll-control">
+            <span>AutoScroll：</span>
+            <span class="toggle_switch">
+                <input type="checkbox" bind:checked={uiState.timeLineAuto} style="visibility: hidden;" />
+                <span class="toggle-slider"></span>
+            </span>
         </label>
         <button class="nmorph_button" onclick={scrollTimeLine}>
             <span class="material-symbols-outlined">skip_next</span>
@@ -228,17 +233,35 @@
 }
 
 .track-controls {
+    --control-size: var(--control-height, 32px);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    min-height: 30px;
-    gap: 6px;
+    min-height: var(--control-size);
+    min-width: 0;
+    gap: 8px;
     white-space: nowrap;
     color: #c4ced0;
 }
 
-.track-controls .nmorph_button {
-    --control-size: var(--control-height-compact);
-    padding: 0 8px;
+.zoom-control,
+.auto-scroll-control {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+    height: var(--control-size);
+    min-width: 0;
+    max-width: 100%;
+}
+
+.zoom-control :global(input[type="range"]) {
+    max-width: 100%;
+}
+
+.auto-scroll-control {
+    grid-template-columns: max-content 30px;
+    flex: 0 0 auto;
 }
 
 /* トラックビュー全体 */

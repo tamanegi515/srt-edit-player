@@ -20,7 +20,7 @@ test("short color popup scrolls without overlapping the eyedropper", async ({ pa
 });
 
 for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 1209 }, { width: 1366, height: 768 }, { width: 768, height: 900 }, { width: 390, height: 844 }]) {
-  test(`panel relief and flat controls at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
+  test(`panel relief and contextual controls at ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
     await page.setViewportSize(viewport);
     const errors = [];
     page.on("pageerror", (error) => errors.push(error.message));
@@ -42,8 +42,15 @@ for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 12
     });
     expect(gaps).toHaveLength(4);
     for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(14);
-    for (const button of await page.locator(".nmorph_button, .CheckButtonArea label").all()) {
-      await expect(button).toHaveCSS("box-shadow", "none");
+    for (const button of await page.locator(".nmorph_button").all()) {
+      if (await button.isDisabled()) {
+        await expect(button).toHaveCSS("box-shadow", "none");
+      } else if (await button.evaluate((el) => !!el.closest(".surface-controls"))) {
+        await expect(button).toHaveCSS("box-shadow", "rgba(0, 0, 0, 0.4) 2px 2px 4px 0px, rgba(255, 255, 255, 0.075) -2px -2px 4px 0px");
+        await expect(button).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+      } else {
+        await expect(button).toHaveCSS("box-shadow", "rgba(255, 255, 255, 0.09) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.28) 0px 1px 2px 0px");
+      }
     }
     expect((await page.locator(".ribbonview").boundingBox()).height).toBeLessThanOrEqual(155);
     await page.screenshot({ path: testInfo.outputPath("panel-controls.png") });

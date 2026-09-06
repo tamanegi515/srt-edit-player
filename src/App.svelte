@@ -487,7 +487,7 @@
 
 <svelte:window onmousedown={clearOverlaySelectionOutsideRibbon} />
 <main inert={loading || convertingTrack}>
-  <header class="app-toolbar">
+  <header class="app-toolbar surface-controls">
     <div class="folder-path">{projectState.folderName}</div>
 
     <div class="toolbar-group">
@@ -619,7 +619,6 @@
             </button>
             <button class="nmorph_button" onclick={scrollEditor} title="再生位置にスクロール"> Scroll </button>
           </div>
-          <span class="toolbar-spacer"></span>
           <div class="toolbar-cluster track-create">
             <input class="new-track-name" data-testid="new-subtitle-track-name" type="text" bind:value={newTrackName} placeholder="new subtitle" />
             <select class="new-track-format" data-testid="new-subtitle-track-format" bind:value={newTrackFormat}>
@@ -677,21 +676,23 @@
   /* ── 上部ツールバー（折り返し対応・グループ化） ── */
   .app-toolbar {
     flex: 0 0 auto;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(160px, 320px) minmax(300px, 452px) 1fr;
     align-items: center;
     gap: 6px 12px;
     padding: 2px 0 4px;
   }
   .toolbar-group {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 32px 32px minmax(120px, 1fr) 32px 32px;
     align-items: center;
     gap: var(--space-control);
+    min-width: 0;
   }
   .toolbar-group.toggles {
+    grid-template-columns: repeat(4, max-content);
     gap: 6px 14px;
-    margin-left: auto;
+    justify-self: end;
   }
   .toggle-field {
     display: inline-flex;
@@ -700,6 +701,7 @@
     cursor: pointer;
     white-space: nowrap;
     color: #c5d0d2;
+    min-height: var(--control-height);
   }
   .toggle-field .head-text {
     margin: 0;
@@ -716,8 +718,8 @@
     cursor: pointer;
   }
   .media-select {
-    min-width: 160px;
-    max-width: 340px;
+    min-width: 0;
+    width: 100%;
     color: #dbe4e5;
     cursor: pointer;
   }
@@ -746,36 +748,38 @@
   /* ── 編集エリア内 ── */
   .editor-toolbar {
     flex: 0 0 auto;
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: center;
-    gap: 4px;
+    gap: var(--space-control) var(--space-group);
     min-height: 32px;
     padding: 0 0 8px;
     border-bottom: 1px solid #313638;
   }
-  .editor-toolbar .toolbar-spacer {
-    flex: 1 1 0;
-  }
   .toolbar-cluster {
-    display: flex;
-    flex-wrap: nowrap; /* クラスタ内では折り返さない（折り返しはクラスタ単位） */
+    display: grid;
+    grid-template-columns: 32px 18px 32px max-content;
     align-items: center;
-    gap: 4px;
+    gap: var(--space-control);
     min-width: 0;
+  }
+  .toolbar-cluster.track-create {
+    grid-template-columns: minmax(44px, 130px) 56px 32px 32px;
+    justify-content: end;
   }
   .editor-toolbar :global(.nmorph_button) {
     margin: 0; /* 間隔は gap で取る。グローバルの margin: 5px 10px は幅を圧迫して折り返しの原因になる */
   }
   .toolbar-cluster.track-create .new-track-name {
-    flex: 1 1 90px; /* 幅が足りない時は入力欄が縮んで1行に収まるようにする */
-    min-width: 60px;
+    width: 100%;
+    min-width: 0;
     max-width: 130px;
   }
   .col-count {
     min-width: 18px;
     text-align: center;
     color: #b4b4b4;
+    font-variant-numeric: tabular-nums;
   }
   .editor-columns {
     flex: 1 1 auto;
@@ -807,8 +811,8 @@
     margin: 0;
     display: inline-block;
     padding: 2px 10px;
-    min-width: 300px;
-    max-width: 600px;
+    min-width: 0;
+    width: 100%;
     height: var(--control-height);
     box-sizing: border-box;
     vertical-align: middle;
@@ -875,16 +879,16 @@
   .new-track-name {
     height: var(--control-height);
     box-sizing: border-box;
-    color: #d6d6d6;
-    background-color: #42424279;
-    border: 1px solid #a3a3a349;
+    color: var(--text-color);
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
   }
   .new-track-format {
     height: var(--control-height);
-    color: #d6d6d6;
-    background-color: #42424279;
-    border: 1px solid #a3a3a349;
+    color: var(--text-color);
+    background-color: var(--input-bg);
+    border: 1px solid var(--border-color);
     border-radius: 4px;
   }
   .resizer:hover::before,
@@ -909,6 +913,8 @@
   }
   .srt_area {
     flex: 0 1 auto; /* 列合計幅までは伸びるが、プレイヤー側が足りない時は縮小を許可する */
+    /* Inline-size containment needs an explicit width; the column total caps it inline. */
+    width: 100%;
     min-width: 200px; /* 縮小してもツールバーのボタン類が残る最低限の幅 */
     min-height: 0;
     box-sizing: border-box;
@@ -919,6 +925,36 @@
     border: 1px solid transparent;
     box-shadow: var(--panel-shadow);
     border-radius: 8px;
+    container-type: inline-size;
+    container-name: editor-panel;
+  }
+
+  @container editor-panel (max-width: 440px) {
+    .editor-toolbar {
+      grid-template-columns: 1fr;
+    }
+    .toolbar-cluster.track-create {
+      justify-content: start;
+    }
+  }
+
+  @media (max-width: 1280px) {
+    .app-toolbar {
+      grid-template-columns: minmax(160px, 320px) minmax(300px, 1fr);
+    }
+    .toolbar-group.toggles {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 720px) {
+    .app-toolbar {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .toolbar-group.toggles {
+      grid-template-columns: repeat(2, max-content);
+      justify-self: start;
+    }
   }
 
   .quick-start {

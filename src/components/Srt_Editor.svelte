@@ -176,14 +176,14 @@
         {#each selectedTrack.data ?? [] as srtdata, index (srtdata)}
             <div class="clip-row">
                 <div class="clip-controls">
-                <button class="dark nmorph_button jump_button" onclick={() => JumpAudio(index)} title="この字幕へ移動" aria-label="この字幕へ移動">
+                <button class="nmorph_button jump_button" onclick={() => JumpAudio(index)} title="この字幕へ移動" aria-label="この字幕へ移動">
                     <span class="material-symbols-outlined" style="font-size:20px;"> turn_left </span>
                 </button>
 
                 {#if iscurrent(index)}
-                    <button class="time-button" onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
+                    <button class="nmorph_button time-button" onclick={() => setStartTime(index)}>{convSecToStr(srtdata.startTime)}</button>
                     <small> - </small>
-                    <button class="time-button" onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
+                    <button class="nmorph_button time-button" onclick={() => setEndTime(index)}>{convSecToStr(srtdata.endTime)}</button>
                 {:else}
                     <small class="time-label">{convSecToStr(srtdata.startTime)} - {convSecToStr(srtdata.endTime)}</small>
                 {/if}
@@ -285,6 +285,7 @@
         margin-bottom: 0;
     }
     .clip-controls {
+        --control-size: 24px;
         display: flex;
         align-items: center;
         flex-wrap: wrap;
@@ -292,12 +293,9 @@
         margin-bottom: 6px;
     }
     .time-button {
-        height: 24px;
-        color: #d6dddd;
-        background: #2d3032;
-        border: 1px solid #454a4d;
-        border-radius: 4px;
-        cursor: pointer;
+        font-size: 13px;
+        font-variant-numeric: tabular-nums;
+        padding: 0 4px;
     }
     .time-label {
         color: #9fa8aa;
@@ -350,22 +348,5 @@
         background-color: #4242424f;
         border: 1px solid #a3a3a328;
         border-radius: 4px;
-    }
-    .dark {
-        accent-color: #14d3b9;
-        background: #313131;
-        color: #bebebe;
-        border-width: 1px;
-        border-radius: 4px;
-        border-right: 1px solid #000000;
-        border-bottom: 1px solid #000000;
-        background-image: linear-gradient(to top left, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0));
-    }
-    .dark:active {
-        color: #b4b4b4;
-        background: #333333;
-        border-right: 1px solid #3f3f3f;
-        border-bottom: 1px solid #3f3f3f;
-        background-image: linear-gradient(to top left, rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0.2));
     }
 </style>

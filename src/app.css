@@ -20,12 +20,21 @@
   --control-radius: 4px;
   --control-bg: #303033;
   --control-hover-bg: #39393d;
-  --control-shadow: none;
+  --control-border: var(--border-color);
+  --control-face: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(0, 0, 0, 0.035));
+  --control-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), 0 1px 2px rgba(0, 0, 0, 0.28);
   --input-bg: #222224;
   --input-shadow: inset 1px 1px 2px rgba(0, 0, 0, 0.2);
   --focus-color: #62cbd0;
   --space-control: 6px;
   --space-group: 12px;
+}
+
+.surface-controls {
+  --control-bg: var(--bg);
+  --control-border: transparent;
+  --control-face: none;
+  --control-shadow: 2px 2px 4px rgba(0, 0, 0, 0.4), -2px -2px 4px rgba(255, 255, 255, 0.075);
 }
 
 html,
@@ -211,8 +220,9 @@ select:focus {
   line-height: 1;
   border-radius: var(--control-radius);
   background: var(--control-bg);
+  background-image: var(--control-face);
   cursor: pointer;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--control-border);
   transition: background-color 0.1s, border-color 0.1s, box-shadow 0.1s;
   box-shadow: var(--control-shadow);
 }
@@ -246,6 +256,10 @@ select:focus {
   opacity: 0.45;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+.surface-controls .nmorph_button:hover:not(:disabled) {
+  border-color: transparent;
 }
 
 
@@ -421,6 +435,7 @@ select:focus {
   border: 1px solid var(--border-color);
   border-radius: var(--control-radius);
   background: var(--control-bg);
+  background-image: var(--control-face);
   box-shadow: var(--control-shadow);
   padding: 2px;
   transition: background-color 0.1s, border-color 0.1s;
@@ -454,7 +469,6 @@ select:focus {
   color: var(--primary-color);
   margin: 0;
   margin-left: 10px;
-  align-self:baseline;
   
 }
 
