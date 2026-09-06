@@ -114,6 +114,7 @@
                     <span class="material-symbols-outlined"> play_arrow </span>
                 {/if}
             </button>
+            <PlaybackRateControl />
             <div class="bar-container">
             <CustomSlider
                 variant="seek"
@@ -136,7 +137,6 @@
                 <CustomSlider min="0" max="1" step="0.01" aria-label="音量" value={mediaState.media.volume} oninput={(event) => useAudio.setVol(event.currentTarget.valueAsNumber)}></CustomSlider>
                 <span class="control-value">{mediaState.media.volume.toFixed(2)}</span>
             </label>
-            <PlaybackRateControl />
         </div>
         {#if !mediaState.media.isAudio}
             <div class="no-audio-note">音声ファイルがありません（字幕の時間のみ表示）</div>
@@ -201,11 +201,11 @@
         border: 1px solid transparent;
         border-radius: 8px;
         background: var(--panel-bg);
-        box-shadow: var(--panel-shadow);
+        box-shadow: none;
     }
     .control-row {
         display: grid;
-        grid-template-columns: 32px minmax(100px, 1fr) max-content max-content;
+        grid-template-columns: 32px 32px minmax(100px, 1fr) max-content;
         align-items: center;
         gap: 8px;
         min-height: var(--control-size);
@@ -224,23 +224,13 @@
     }
     @container media-player (max-width: 650px) {
         .control-row {
-            grid-template-columns: 32px minmax(0, 1fr);
+            grid-template-columns: 32px 32px minmax(0, 1fr);
             gap: 4px 6px;
-        }
-        .control-row :global(.playback-rate-control) {
-            grid-column: 1 / -1;
-            justify-self: end;
-            grid-row: 2;
         }
         .volume-control {
             grid-column: 1 / -1;
             grid-row: 2;
             justify-self: start;
-        }
-    }
-    @container media-player (max-width: 369px) {
-        .control-row :global(.playback-rate-control) {
-            grid-row: 3;
         }
     }
     .control-value {

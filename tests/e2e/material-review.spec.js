@@ -31,6 +31,10 @@ for (const viewport of [{ width: 1926, height: 1200 }, { width: 1426, height: 12
     await expect.poll(() => panels.count()).toBeGreaterThanOrEqual(7);
     for (const panel of await panels.all()) {
       await expect(panel).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+      if (await panel.evaluate(el => el.classList.contains("media-controls"))) {
+        await expect(panel).toHaveCSS("box-shadow", "none");
+        continue;
+      }
       const inRibbon = await panel.evaluate((el) => el.classList.contains("ribbon-area"));
       await expect(panel).toHaveCSS("box-shadow", inRibbon
         ? "rgba(0, 0, 0, 0.36) 3px 3px 6px 0px, rgba(255, 255, 255, 0.1) -2px -2px 5px 0px"

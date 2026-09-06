@@ -157,6 +157,32 @@ for (const control of [
   });
 }
 
+test("rate icon wheel updates audio and shared rate without seeking or scrolling", async ({ page }) => {
+  await loadControlsFixture(page);
+  const trigger = page.getByRole("button", { name: "倍速を調整", exact: true });
+  const rate = page.getByRole("slider", { name: "倍速", exact: true });
+  const seek = page.getByRole("slider", { name: "再生位置", exact: true });
+  const position = await seek.inputValue();
+  await trigger.hover();
+  await page.mouse.wheel(0, -100);
+  await expect(rate).toHaveValue("1.05");
+  await expectAudioMatches(page, rate, "playbackRate");
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, 100);
+  await page.keyboard.up("Shift");
+  await expect(rate).toHaveValue("0.8");
+  await expectAudioMatches(page, rate, "playbackRate");
+  for (const [value, delta] of [["0.5", 100], ["3", -100]]) {
+    await rate.fill(value);
+    await trigger.hover();
+    await page.mouse.wheel(0, delta);
+    await expect(rate).toHaveValue(value);
+    await expectAudioMatches(page, rate, "playbackRate");
+  }
+  await expect(seek).toHaveValue(position);
+  expect(await page.evaluate(() => scrollY)).toBe(0);
+});
+
 test("the generated WAV really plays and stage wheel seeks it", async ({ page }) => {
   await loadControlsFixture(page);
   const seek = page.getByRole("slider", { name: "再生位置", exact: true });

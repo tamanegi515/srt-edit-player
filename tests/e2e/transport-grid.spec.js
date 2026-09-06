@@ -4,8 +4,8 @@ test.use({ viewport: { width: 1664, height: 1000 } });
 
 async function expectContainedControls(surface) {
   const issues = await surface.evaluate(element => {
-    const bounds = element.getBoundingClientRect();
     return [...element.querySelectorAll("button, input[type=range], label, .control-value")].flatMap(control => {
+      const bounds = (control.closest(".rate-options") ?? element).getBoundingClientRect();
       const rect = control.getBoundingClientRect();
       const failures = [];
       if (rect.left < bounds.left - 1 || rect.right > bounds.right + 1) failures.push("horizontal overflow");
@@ -88,7 +88,7 @@ test("timeline controls share 32px rows and only wrap when necessary", async ({ 
   await page.screenshot({ path: testInfo.outputPath("timeline-wrapped.png") });
 });
 
-test("rate expansion supports hover, keyboard and click without covering the preview", async ({ page }) => {
+test("floating rate control supports hover, keyboard and click above the icon", async ({ page }) => {
   await page.goto("/");
   const trigger = page.getByRole("button", { name: "倍速を調整", exact: true });
   const rate = page.getByRole("slider", { name: "倍速", exact: true });
@@ -97,8 +97,8 @@ test("rate expansion supports hover, keyboard and click without covering the pre
   await expect(trigger).toHaveAttribute("aria-expanded", "true");
   await rate.hover();
   await expect(rate).toBeVisible();
-  const stage = await page.locator(".media-stage").boundingBox();
-  expect((await rate.boundingBox()).y).toBeGreaterThanOrEqual(stage.y + stage.height);
+  const popup = await page.locator(".rate-options").boundingBox();
+  expect(popup.y + popup.height).toBeLessThanOrEqual((await trigger.boundingBox()).y - 8);
   await page.mouse.move(1, 1);
   await expect(rate).toHaveCount(0);
   await trigger.focus();

@@ -17,10 +17,11 @@ async function openPlayer(page, width) {
 
 async function expectContained(page) {
     const issues = await page.locator(".media-controls").evaluate(node => {
-        const bounds = node.getBoundingClientRect();
         return [...node.querySelectorAll("button, input[type=range], .control-value, .setRight")].flatMap(control => {
+            const bounds = (control.closest(".rate-options") ?? node).getBoundingClientRect();
             const r = control.getBoundingClientRect();
             const issues = [];
+            if (r.left < 0 || r.right > innerWidth || r.top < 0 || r.bottom > innerHeight) issues.push("outside viewport");
             if (r.left < bounds.left || r.right > bounds.right || r.top < bounds.top || r.bottom > bounds.bottom) issues.push("outside");
             if (control.matches("button, input[type=range]") && r.height !== 32) issues.push("height");
             if (control.matches("input[type=range]") && r.width < 24) issues.push("slider too short");
@@ -38,8 +39,12 @@ for (const width of [220, 500, 800]) {
         const controls = page.locator(".media-controls");
         await expectContained(page);
         const play = await page.getByTestId("toggle-playback").boundingBox();
+        const trigger = await page.getByRole("button", { name: "倍速を調整" }).boundingBox();
         const seek = await page.getByRole("slider", { name: "再生位置", exact: true }).boundingBox();
         expect(play.y).toBe(seek.y);
+        expect(trigger.y).toBe(play.y);
+        expect(trigger.x - play.x - play.width).toBeGreaterThanOrEqual(6);
+        expect(trigger.x - play.x - play.width).toBeLessThanOrEqual(8);
         expect(seek.x).toBeGreaterThan(play.x + play.width);
         expect((await page.getByRole("slider", { name: "音量", exact: true }).boundingBox()).width).toBe(72);
         const collapsed = await controls.boundingBox();
@@ -47,15 +52,17 @@ for (const width of [220, 500, 800]) {
         await page.getByRole("button", { name: "倍速を調整" }).click();
         await expect(page.getByRole("slider", { name: "倍速", exact: true })).toBeVisible();
         await expectContained(page);
-        if (width >= 370) expect((await controls.boundingBox()).height).toBe(collapsed.height);
-        const stage = await page.locator(".media-stage").boundingBox();
+        expect(await controls.boundingBox()).toEqual(collapsed);
+        expect(await page.getByRole("slider", { name: "再生位置", exact: true }).boundingBox()).toEqual(seek);
         const rate = await page.locator(".rate-options").boundingBox();
-        expect(rate.y).toBeGreaterThanOrEqual(stage.y + stage.height);
+        expect(rate.y + rate.height).toBeLessThanOrEqual(trigger.y - 8);
+        expect(rate.x).toBe(trigger.x);
+        await expect(controls).toHaveCSS("box-shadow", "none");
         await page.screenshot({ path: testInfo.outputPath(`compact-player-${width}.png`) });
     });
 }
 
-test("rate hover reveals a usable inline slider without moving the trigger", async ({ page }) => {
+test("rate hover reveals a floating slider with a continuous hover path and fixed trigger", async ({ page }) => {
     await openPlayer(page, 800);
     const trigger = page.getByRole("button", { name: "倍速を調整" });
     const before = await trigger.boundingBox();
@@ -63,6 +70,9 @@ test("rate hover reveals a usable inline slider without moving the trigger", asy
     const slider = page.getByRole("slider", { name: "倍速", exact: true });
     await expect(slider).toBeVisible();
     expect(await trigger.boundingBox()).toEqual(before);
+    await page.mouse.move(before.x + before.width / 2, before.y - 4);
+    await page.waitForTimeout(100);
+    await expect(slider).toBeVisible();
     await slider.hover();
     await expect(slider).toBeVisible();
     await page.mouse.move(1, 1);
