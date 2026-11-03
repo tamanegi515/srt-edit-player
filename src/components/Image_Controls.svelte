@@ -1,6 +1,6 @@
 <script>
     import { onDestroy, untrack } from "svelte";
-    import { getFileFromPath } from "../lib/util";
+    import { getImageFileFromPath } from "../lib/image_files";
     import { mediaState, projectState, uiState } from "../lib/store.svelte";
     import { getCurrentText } from "../lib/data_process";
 
@@ -17,7 +17,7 @@
     async function loadImage(targetImageData, dirHandle, path, index, token) {
         pendingImage = { target: targetImageData, index };
         try {
-            const imageFile = await getFileFromPath(dirHandle, path.replace(/\\/g, "/"));
+            const imageFile = await getImageFileFromPath(dirHandle, path);
             if (!imageFile || token !== imageRequestToken || mediaState.media.image_data !== targetImageData) return;
             const imageURL = URL.createObjectURL(imageFile);
             const oldUrl = targetImageData.currentImage;

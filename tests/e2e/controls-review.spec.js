@@ -1,14 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { getDefaultJsonData } from "../../src/lib/data_process.js";
 
-async function loadControlsFixture(page, { noImage = false, noAudio = false, tracks = 1 } = {}) {
+async function loadControlsFixture(page, { noImage = false, noAudio = false, tracks = 1, detectImageExtensions = false } = {}) {
   const project = getDefaultJsonData();
   project.name = "controls.vc_json";
   project.audioFilePath = noAudio ? "" : "controls.wav";
   project.imageSrtPath = noImage ? "" : "images.srt";
   project.scriptFiles[0].filePath = "captions.srt";
   project.scriptFiles = Array.from({ length: tracks }, () => structuredClone(project.scriptFiles[0]));
-  await page.addInitScript((project) => {
+  await page.addInitScript(({ project, detectImageExtensions }) => {
     // A real 12-second PCM WAV, generated here so no local media is required.
     const rate = 8000;
     const samples = rate * 12;
@@ -30,12 +30,25 @@ async function loadControlsFixture(page, { noImage = false, noAudio = false, tra
     view.setUint32(40, samples * 2, true);
     for (let i = 0; i < samples; i++) view.setInt16(44 + i * 2, Math.sin(i * 2 * Math.PI * 440 / rate) * 1000, true);
     const png = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aX1sAAAAASUVORK5CYII="), char => char.charCodeAt(0));
+    const imageReferences = detectImageExtensions ? ["a", "b.jpg", "c"] : ["a.png", "b.png", "c.png"];
+    const imageFiles = detectImageExtensions ? ["a.PNG", "b.webp", "c.jpg"] : imageReferences;
+    const makeImage = name => {
+      if (!detectImageExtensions) return new File([png], name, { type: "image/png" });
+      const canvas = document.createElement("canvas");
+      canvas.width = canvas.height = 2;
+      canvas.getContext("2d").fillRect(0, 0, 2, 2);
+      const type = name.endsWith(".webp") ? "image/webp" : name.endsWith(".jpg") ? "image/jpeg" : "image/png";
+      const bytes = Uint8Array.from(atob(canvas.toDataURL(type).split(",")[1]), char => char.charCodeAt(0));
+      return new File([bytes], name, { type });
+    };
     const files = new Map([
       [project.name, new File([JSON.stringify(project)], project.name, { type: "application/json" })],
       ["controls.wav", new File([wav], "controls.wav", { type: "audio/wav" })],
       ["captions.srt", new File(["1\n00:00:00,000 --> 00:00:12,000\nControls fixture\n"], "captions.srt")],
-      ["images.srt", new File(["1\n00:00:00,000 --> 00:00:04,000\na.png\n\n2\n00:00:04,000 --> 00:00:08,000\nb.png\n\n3\n00:00:08,000 --> 00:00:12,000\nc.png\n"], "images.srt")],
-      ...["a.png", "b.png", "c.png"].map(name => [name, new File([png], name, { type: "image/png" })]),
+      ["images.srt", new File([imageReferences.map((reference, index) =>
+        `${index + 1}\n00:00:${String(index * 4).padStart(2, "0")},000 --> 00:00:${String((index + 1) * 4).padStart(2, "0")},000\n${reference}\n\n`
+      ).join("")], "images.srt")],
+      ...imageFiles.map(name => [name, makeImage(name)]),
     ]);
     const gates = new Map();
     window.__imageReads = {};
@@ -77,7 +90,7 @@ async function loadControlsFixture(page, { noImage = false, noAudio = false, tra
       },
     });
     window.__readFixture = async name => files.get(name)?.text();
-  }, project);
+  }, { project, detectImageExtensions });
   await page.goto("/");
   await page.getByRole("button", { name: /フォルダを開く/ }).first().click();
   await page.evaluate(async () => {
@@ -227,6 +240,26 @@ test("font wheel stays in the option list and serializes as a string", async ({ 
 async function currentImagePath(page) {
   return page.evaluate(() => window.controlsStore.mediaState.media.image_data.currentImagePath);
 }
+
+test("image auto detection displays PNG, WebP and JPEG on initial load, manual navigation and seek", async ({ page }) => {
+  await loadControlsFixture(page, { detectImageExtensions: true });
+  const decoded = () => page.locator(".media-image").evaluate(image => image.complete && image.naturalWidth === 2);
+  await expect.poll(decoded).toBe(true);
+  expect(await page.evaluate(async () => (await fetch(document.querySelector(".media-image").src)).blob().then(blob => blob.type)))
+    .toBe("image/png");
+  await page.getByTitle("画像自動切り替え").locator("input").uncheck({ force: true });
+  await page.getByRole("button", { name: "次の画像", exact: true }).click();
+  await expect.poll(() => currentImagePath(page)).toBe("b.jpg");
+  await expect.poll(decoded).toBe(true);
+  expect(await page.evaluate(async () => (await fetch(document.querySelector(".media-image").src)).blob().then(blob => blob.type)))
+    .toBe("image/webp");
+  await page.getByTitle("画像自動切り替え").locator("input").check({ force: true });
+  await page.getByRole("slider", { name: "再生位置", exact: true }).fill("9");
+  await expect.poll(() => currentImagePath(page)).toBe("c");
+  await expect.poll(decoded).toBe(true);
+  expect(await page.evaluate(async () => (await fetch(document.querySelector(".media-image").src)).blob().then(blob => blob.type)))
+    .toBe("image/jpeg");
+});
 
 test("latest auto image wins when same-media requests finish in reverse order", async ({ page }) => {
   await loadControlsFixture(page);

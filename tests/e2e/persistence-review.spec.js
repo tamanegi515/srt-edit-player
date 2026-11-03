@@ -17,6 +17,7 @@ import {
   syncJsonDataFromMedia,
 } from "../../src/lib/data_process.js";
 import { convSecToStr, convStrToSec } from "../../src/lib/util.js";
+import { getImageFileFromPath } from "../../src/lib/image_files.js";
 
 function memoryFs(initial = {}, failures = {}) {
   const files = new Map(Object.entries(initial));
@@ -109,6 +110,72 @@ function project(paths, extras = {}) {
     ...extras,
   };
 }
+
+test("image references resolve omitted and mismatched extensions within their directory", async () => {
+  const fs = memoryFs({
+    "イラスト/01.PNG": "png",
+    "イラスト/02.jpg": "jpg",
+    "イラスト/03.webp": "webp",
+    "イラスト/scene.v2.JPEG": "jpeg",
+    "other/04.png": "other directory",
+    "イラスト/04.txt": "not an image",
+  });
+  for (const [reference, expected] of [
+    ["イラスト\\01", "png"],
+    ["イラスト/01.jpg", "png"],
+    ["イラスト/02", "jpg"],
+    ["イラスト/03.png", "webp"],
+    ["イラスト/scene.v2", "jpeg"],
+    ["イラスト/scene.v2.jpg", "jpeg"],
+  ]) {
+    expect(await (await getImageFileFromPath(fs.dir, reference)).text()).toBe(expected);
+  }
+  await expect(getImageFileFromPath(fs.dir, "イラスト/04")).rejects.toHaveProperty("name", "NotFoundError");
+  await expect(getImageFileFromPath(fs.dir, "missing/01")).rejects.toHaveProperty("name", "NotFoundError");
+});
+
+test("image loading preserves exact matches and does not hide permission or read failures", async () => {
+  const initial = { "01.jpg": "jpg", "01.png": "png" };
+  expect(await (await getImageFileFromPath(memoryFs(initial).dir, "01.jpg")).text()).toBe("jpg");
+  for (const failures of [
+    { "handle:01.jpg": "NotAllowedError" },
+    { "read:01.jpg": "NotReadableError" },
+    { "read:01.jpg": "NotFoundError" },
+  ]) {
+    await expect(getImageFileFromPath(memoryFs(initial, failures).dir, "01.jpg"))
+      .rejects.toHaveProperty("name", Object.values(failures)[0]);
+  }
+});
+
+test("image extension detection uses PNG, JPG, JPEG, WebP, BMP, GIF priority regardless of directory order", async () => {
+  const extensions = ["png", "jpg", "jpeg", "webp", "bmp", "gif"];
+  const fs = memoryFs(Object.fromEntries([...extensions].reverse().map(ext => [`01.${ext}`, ext])));
+  for (const extension of extensions) {
+    for (const reference of ["01", "01.png"]) {
+      expect(await (await getImageFileFromPath(fs.dir, reference)).text()).toBe(extension);
+    }
+    fs.files.delete(`01.${extension}`);
+  }
+  await expect(getImageFileFromPath(fs.dir, "01")).rejects.toHaveProperty("name", "NotFoundError");
+});
+
+test("initial image auto detection survives timing saves and project reloads without rewriting references", async () => {
+  for (const reference of ["イラスト\\01", "イラスト\\01.jpg"]) {
+    const fs = memoryFs({ "字幕/image.srt": srt(reference), "イラスト/01.webp": "image" });
+    const json = project([], { imageSrtPath: "字幕/image.srt" });
+    const media = await getMedia(json, fs.dir);
+    expect(media.image_data.currentImage).toMatch(/^blob:/);
+    const track = media.srt_data.find(track => track.isImageTrack);
+    expect(track.data[0].text).toBe(reference);
+    track.data[0].endTime = 2;
+    expect(await saveSubtitleTrack(fs.dir, track)).toBe(true);
+    expect(parseSrt(fs.files.get("字幕/image.srt"))[0].text).toBe(reference);
+    const reloaded = await getMedia(json, fs.dir);
+    expect(reloaded.image_data.currentImage).toMatch(/^blob:/);
+    URL.revokeObjectURL(media.image_data.currentImage);
+    URL.revokeObjectURL(reloaded.image_data.currentImage);
+  }
+});
 
 test("persists exact SRT and JSON references across repeated project reloads", async () => {
   const paths = ["captions.srt", "a/captions.srt", "b/captions.srt", "a/captions.json", "b/captions.json"];
